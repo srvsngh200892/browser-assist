@@ -1,0 +1,53 @@
+FROM denoland/deno:2.2.2
+
+# Install curl, Node.js, and required dependencies
+RUN apt-get update && \
+    apt-get install -y curl gnupg ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs \
+        libnss3 \
+        libatk-bridge2.0-0 \
+        libx11-xcb1 \
+        libdbus-1-3 \
+        fonts-liberation \
+        libappindicator3-1 \
+        libatk1.0-0 \
+        libgdk-pixbuf2.0-0 \
+        libnspr4 \
+        libxss1 \
+        libasound2 \
+        libxtst6 \
+        libxdamage1 \
+        libxxf86vm1 \
+        libappindicator1 \
+        libdbus-glib-1-2 && \
+    apt-get clean && \
+    node -v && npm -v && npx --version
+
+# Clear npm cache
+# RUN npm cache clean --force
+
+# # Set environment variables for Playwright
+# ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+
+RUN npm install -g playwright@1.44.1 @playwright/mcp@latest
+
+# Install the Playwright browsers with explicit version control
+RUN npx playwright install --with-deps chromium
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY deno.json deno.lock ./
+COPY src/ ./src/
+
+# Cache Deno dependencies
+RUN deno cache --lock=deno.lock src/server.ts
+
+# Expose application port
+EXPOSE 3001
+
+# Default command to run your Deno application
+CMD ["deno", "run", "--allow-all", "src/server.ts"]
+

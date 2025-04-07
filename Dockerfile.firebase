@@ -1,0 +1,14 @@
+FROM node:18
+
+# Install Java
+RUN apt-get update && \
+    apt-get install -y default-jre && \
+    apt-get clean
+
+# Install Firebase CLI
+RUN npm install -g firebase-tools
+
+WORKDIR /app
+COPY . .
+
+CMD ["firebase", "emulators:start", "--only", "firestore"]

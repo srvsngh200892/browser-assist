@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        #chat-container {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+
+        .user {
+            background-color: #e3f2fd;
+            align-self: flex-end;
+        }
+
+        .assistant {
+            background-color: #f5f5f5;
+        }
+
+        .input-container {
+            display: flex;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #send-button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chat API</h1>
+    <div id="chat-container"></div>
+    <div class="input-container">
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button id="send-button">Send</button>
+    </div>
+    <p><a href="/stream.html" target="_blank" style="color: #4caf50; text-decoration: none; font-weight: bold;">Open
+            Browser Stream Viewer</a></p>
+
+    <script>
+        let sessionId = null;
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        // Initialize the session when the page loads
+        async function initSession() {
+            try {
+                // First, initialize the server
+                await fetch('/init');
+
+                // Then create a new session
+                const response = await fetch('/session', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    sessionId = data.sessionId;
+                } else {
+                    displayErrorMessage('Failed to create session');
+                }
+            } catch (error) {
+                displayErrorMessage('Error initializing: ' + error.message);
+            }
+        }
+
+        // Send a message
+        async function sendMessage(message) {
+            if (!sessionId) {
+                await initSession();
+            }
+
+            try {
+                // Display user message immediately
+                displayMessage('user', message);
+
+                // Clear input
+                messageInput.value = '';
+
+                // Send message to server
+                const response = await fetch(`/chat/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                // Log response for debugging
+                console.log('Response status:', response.status);
+
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (data.success) {
+                    // Find only the assistant messages that haven't been displayed yet
+                    const messages = data.messages;
+                    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+
+                    // Display the most recent assistant message
+                    if (assistantMessages.length > 0) {
+                        const latestMessage = assistantMessages[assistantMessages.length - 1];
+                        displayMessage('assistant', latestMessage.content);
+                    }
+                } else {
+                    displayErrorMessage('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error in sendMessage:', error);
+                displayErrorMessage('Error sending message: ' + error.message);
+            }
+        }
+
+        // Display a message in the chat container
+        function displayMessage(role, content) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', role);
+            messageElement.textContent = content;
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Display an error message
+        function displayErrorMessage(message) {
+            console.error(message);
+            displayMessage('system', 'Error: ' + message);
+        }
+
+        // Set up event listeners
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+            if (message) {
+                sendMessage(message);
+            }
+        });
+
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                const message = messageInput.value.trim();
+                if (message) {
+                    sendMessage(message);
+                }
+            }
+        });
+
+        // Initialize the session when the page loads
+        initSession();
+    </script>
+</body>
+
+</html>

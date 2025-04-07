@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User collection rules
+    match /users/{userId} {
+      // Allow read own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow create with valid data - NO AUTH REQUIRED FOR REGISTRATION
+      allow create: if request.resource.data.keys().hasAll(['email', 'username', 'password'])
+                     && request.resource.data.email is string
+                     && request.resource.data.username is string
+                     && request.resource.data.password is string;
+                     
+      // Allow update own profile but not password
+      allow update: if request.auth != null && request.auth.uid == userId
+                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['password']);
+    }
+    
+    // Allow listing users for authentication purposes (email lookup)
+    match /users/{document=**} {
+      allow list: if true;
+    }
+    
+    // Session rules
+    match /sessions/{sessionId} {
+      // Only allow access to sessions created by this user
+      allow read, write: if request.auth != null && 
+                           resource.data.userId == request.auth.uid;
+    }
+    
+    // Message rules
+    match /messages/{messageId} {
+      // Only allow access to messages for sessions owned by this user
+      allow read, write: if request.auth != null && 
+                           exists(/databases/$(database)/documents/sessions/$(resource.data.sessionId)) &&
+                           get(/databases/$(database)/documents/sessions/$(resource.data.sessionId)).data.userId == request.auth.uid;
+    }
+    
+    // For development with emulator, allow all operations
+    // Comment this out for production
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+} 

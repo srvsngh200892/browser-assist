@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Firebase emulator service
+  firebase:
+    build:
+      context: .
+      dockerfile: Dockerfile.firebase
+    image: browser-assist-firebase:latest
+    container_name: browser-assist-firebase
+    ports:
+      - "4000:4000"  # Firebase emulator UI
+      - "8080:8080"  # Firestore
+      - "9099:9099"  # Auth
+    volumes:
+      - ./firebase-data:/app/firebase-data  # For data persistence
+    networks:
+      - app-network
+
+  # Server service (Deno backend)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: browser-assist-server:latest
+    container_name: browser-assist-server
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env.development
+    environment:
+      # This ensures the container uses the correct hostname for the Firebase emulator
+      - FIREBASE_EMULATOR_HOST=firebase
+    volumes:
+      - ./src:/app/src  # For development hot-reloading
+    depends_on:
+      - firebase
+    networks:
+      - app-network
+
+  # UI service (React frontend)
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: browser-assist-ui:latest
+    container_name: browser-assist-ui
+    ports:
+      - "3002:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge 

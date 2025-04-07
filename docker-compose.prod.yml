@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Server service (Deno backend)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: browser-assist-server:latest
+    container_name: browser-assist-server
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env.production
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # UI service (React frontend)
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: browser-assist-ui:latest
+    container_name: browser-assist-ui
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge 
