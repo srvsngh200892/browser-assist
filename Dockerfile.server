@@ -40,14 +40,14 @@ WORKDIR /app
 
 # Copy project files
 COPY deno.json deno.lock ./
-COPY server/ ./src/
+COPY server/ ./server/
 
 # Cache Deno dependencies
-RUN deno cache --lock=deno.lock src/server.ts
+RUN deno cache --lock=deno.lock server/server.ts
 
 # Expose application port
 EXPOSE 3001
 
 # Default command to run your Deno application
-CMD ["deno", "run", "--allow-all", "src/server.ts"]
+CMD ["deno", "run", "--allow-all", "server/server.ts"]
 

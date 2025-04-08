@@ -12,6 +12,7 @@ const transports: { [sessionId: string]: SSEServerTransport } = {};
 app.get("/sse", async (_: Request, res: Response) => {
     const transport = new SSEServerTransport("/messages", res);
     transports[transport.sessionId] = transport;
+    console.log("Transport created for sessionId:", transport.sessionId);
     res.on("close", () => {
         delete transports[transport.sessionId];
     });
@@ -20,6 +21,7 @@ app.get("/sse", async (_: Request, res: Response) => {
 
 app.post("/messages", async (req: Request, res: Response) => {
     const sessionId = req.query.sessionId as string;
+    console.log("Received message for sessionId:", sessionId);
     const transport = transports[sessionId];
     if (transport) {
         await transport.handlePostMessage(req, res);

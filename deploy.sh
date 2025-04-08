@@ -33,6 +33,10 @@ fi
 # Build Docker images
 build_images() {
   echo "Building Docker images"
+
+  # Build server image
+  echo "Building server image..."
+  docker build -t mcp-playwright-sse-server:latest -f Dockerfile.sse .
   
   # Build server image
   echo "Building server image..."

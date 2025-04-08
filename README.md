@@ -72,7 +72,7 @@ This enables offline development with local Firestore emulation. See [FIREBASE-E
 
 ```bash
 # Install server dependencies
-deno cache --reload src/server.ts
+deno cache --reload server/server.ts
 
 # Configure your Firebase settings in .env
 # See .env.example and .env.firebase for guidance

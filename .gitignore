@@ -1,3 +1,7 @@
 .env
 .env.development
 *messages.json
+*ui/node_modules
+*firebase-debug.log
+*firestore-debug.log
+*ui-debug.log
