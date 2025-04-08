@@ -29,7 +29,8 @@ export interface SessionMetadata {
 export interface StreamState {
     sessionId: string;
     active: boolean;
-    pauseReason?: string; // Can be empty string or undefined
+    streamId?: string;     // Unique ID for each stream to prevent stream hijacking
+    pauseReason?: string;  // Can be empty string or undefined
     pausedAt?: number;
     resumedAt?: number;
     lastScreenshotAt?: number; // Added to track last screenshot time

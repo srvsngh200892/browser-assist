@@ -1184,6 +1184,49 @@ router.get("/browser-stream/:sessionId", async (ctx) => {
 
                 // Start sending screenshots
                 sendScreenshot();
+                // Handle client disconnection
+                if (ctx.req) {
+                    ctx.req.on("close", async () => {
+                        if (!isStreamConnected) return;
+
+                        console.log(`Client for session ${sessionId} has disconnected`);
+                        isStreamConnected = false;
+
+                        // Close the controller
+                        try {
+                            controller.close();
+                        } catch (closeError) {
+                            console.error(`Error closing stream controller for ${sessionId}:`, closeError);
+                        }
+
+                        // Clear the stream state in Firebase
+                        try {
+                            await clearStreamState(sessionId);
+                            console.log(`Cleared stream state for session ${sessionId} in Firebase`);
+                        } catch (clearError) {
+                            console.error(`Failed to clear stream state for ${sessionId}:`, clearError);
+                        }
+                    });
+                } else {
+                    console.warn(`Cannot set up disconnect handler for session ${sessionId}: ctx.req is undefined`);
+
+                    // Set up alternative cleanup for when the stream naturally ends
+                    setTimeout(async () => {
+                        // Only cleanup if we haven't already cleaned up
+                        if (isStreamConnected) {
+                            console.log(`Cleaning up stream for session ${sessionId} via timeout since ctx.req was undefined`);
+                            isStreamConnected = false;
+
+                            // Clear the stream state in Firebase
+                            try {
+                                await clearStreamState(sessionId);
+                                console.log(`Cleared stream state for session ${sessionId} in Firebase`);
+                            } catch (clearError) {
+                                console.error(`Failed to clear stream state for ${sessionId}:`, clearError);
+                            }
+                        }
+                    }, 300000); // 5 minutes timeout as a fallback
+                }
 
                 // Set a maximum duration for the stream
                 setTimeout(() => {

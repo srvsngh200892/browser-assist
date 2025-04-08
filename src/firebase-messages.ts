@@ -239,7 +239,8 @@ export async function getSessionMessages(sessionId: string, lastRetrievalTime?: 
         let messagesQuery = query(
             messagesRef,
             where("sessionId", "==", sessionId),
-            orderBy("timestamp", "asc")
+            orderBy("timestamp", "asc"),
+            limit(10)
         );
 
         // If lastRetrievalTime is provided, only get messages after that time

@@ -1698,13 +1698,6 @@ function App() {
                         source.onmessage = (event) => {
                             console.log('STREAM DEBUG: Received message event:', event.type, 'Data length:', event.data?.length || 0);
 
-                            // Check if we should be processing data (not in "waiting" state)
-                            if (streamStatus === 'waiting') {
-                                // Skip processing when in waiting state
-                                console.log('STREAM DEBUG: In waiting state, skipping data processing');
-                                return;
-                            }
-
                             // Process image data
                             if (event.data && event.data.startsWith('data:image')) {
                                 console.log('STREAM DEBUG: Image received, length:', event.data.length);
