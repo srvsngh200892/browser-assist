@@ -52,6 +52,20 @@ services:
     networks:
       - app-network
 
+  services:
+    playwright-sse-mcp-server:
+      build:
+        context: .
+        dockerfile: Dockerfile.sse
+      image: mcp-playwright-see-server:latest
+      container_name: mcp-playwright-see-server
+      restart: ${RESTART_POLICY:-no}
+      ports:
+        - "${PORT:-3003}:${PORT:-3003}"
+      env_file:
+        - .env.development
+      networks:
+        - app-network
 networks:
   app-network:
     driver: bridge 

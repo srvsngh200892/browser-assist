@@ -40,7 +40,7 @@ WORKDIR /app
 
 # Copy project files
 COPY deno.json deno.lock ./
-COPY src/ ./src/
+COPY server/ ./src/
 
 # Cache Deno dependencies
 RUN deno cache --lock=deno.lock src/server.ts
