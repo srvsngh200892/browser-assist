@@ -12,7 +12,7 @@ import { OPENAI_API_KEY, OPENAI_MODEL } from "./env.ts";
 import { MessageHandler, type MessageType } from "./messages.ts";
 import { performNextStepSystemPrompt } from "./prompts.ts";
 import { randomUUID } from "node:crypto";
-import { initFirebase, sessionHasMessages, getNewMessages } from "./firebase-messages.ts";
+import { sessionHasMessages, getNewMessages } from "./firebase-messages.ts";
 import {
     createSession as createFirebaseSession,
     sessionExists,
@@ -76,77 +76,6 @@ const sessions = new Map<string, MessageHandler>();
 // REMOVED: const activeStreamSessions = new Map(); // Map to track active stream sessions with their state
 // This global map is not scalable across multiple servers and will be replaced with Firebase
 
-// Initialize tools at server startup
-async function initializeTools() {
-    try {
-        console.log("Initializing MCP tools...");
-
-        // Check if MCP client is connected
-        if (!mcpClient) {
-            console.error("MCP client is not initialized!");
-            return false;
-        }
-
-        console.log("Checking MCP tools availability...");
-        const mcpToolsList = await mcpClient.listTools();
-
-        if (!mcpToolsList || mcpToolsList.length === 0) {
-            console.error("No MCP tools found! Please check your MCP server configuration.");
-            return false;
-        }
-
-        // Check if browser_take_screenshot tool is available
-        const screenshotTool = Array.isArray(mcpToolsList) && mcpToolsList.find(tool =>
-            tool?.name === "browser_take_screenshot" ||
-            tool?.schema?.name === "browser_take_screenshot"
-        );
-
-        if (!screenshotTool) {
-            console.warn("browser_take_screenshot tool not found in available MCP tools!");
-            if (Array.isArray(mcpToolsList)) {
-                const toolNames = mcpToolsList.map(t => t?.name || t?.schema?.name).filter(Boolean);
-                console.warn("Available tools:", toolNames.join(", ") || "none");
-            }
-        } else {
-            console.log("browser_take_screenshot tool is available!");
-        }
-
-        openAiTools = mapToolListToOpenAiTools(mcpToolsList);
-        console.log(`Successfully initialized ${openAiTools.length} tools`);
-
-        // Test MCP screenshot tool
-        try {
-            console.log("Testing MCP browser_take_screenshot tool...");
-            const testResult = await mcpClient.callTool({
-                name: "browser_take_screenshot",
-                arguments: {}
-            });
-
-            if (!testResult || !testResult.content || !Array.isArray(testResult.content)) {
-                console.warn("MCP Screenshot test returned unexpected format:", testResult);
-                console.log("Screenshots may not work correctly - please check MCP server configuration");
-            } else {
-                const imageContent = testResult.content.find(item => item.type === 'image');
-                if (!imageContent || !imageContent.data) {
-                    console.warn("MCP Screenshot test: No image data found in response");
-                    console.log("Screenshots may be blank - please check MCP server configuration");
-                } else {
-                    console.log("MCP Screenshot test successful! Image size:", imageContent.data.length, "bytes");
-                    console.log("MCP Screenshot type:", imageContent.mimeType || 'image/png');
-                }
-            }
-        } catch (testError) {
-            console.error("MCP Screenshot test failed:", testError);
-            console.error("This will cause blank screenshots. Make sure the MCP browser is running with:");
-            console.error("npx @playwright/mcp@latest");
-        }
-
-        return true;
-    } catch (error) {
-        console.error("Failed to initialize MCP tools:", error);
-        return false;
-    }
-}
 
 // Get or create a message handler for a session
 async function getOrCreateMessageHandler(sessionId: string): Promise<MessageHandler> {
@@ -623,6 +552,8 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
         // Continue processing until the agent indicates completion
         const maxIterations = Number.MAX_SAFE_INTEGER;
         let summarizationApplied = false;
+        const mcpToolsList = await mcpClient.listTools();
+        const openAiTools = mapToolListToOpenAiTools(mcpToolsList);
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             try {
@@ -773,45 +704,6 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
     }
 }
 
-// Initialize the server and fetch tools
-router.get("/init", authMiddleware, async (ctx) => {
-    try {
-        // Initialize Firebase first
-        const firebaseInitSuccess = await initFirebase();
-        if (!firebaseInitSuccess) {
-            ctx.response.status = 500;
-            ctx.response.body = {
-                success: false,
-                error: "Failed to initialize Firebase"
-            };
-            return;
-        }
-
-        const mcpToolsSuccess = await initializeTools();
-
-        if (!mcpToolsSuccess) {
-            ctx.response.status = 500;
-            ctx.response.body = {
-                success: false,
-                error: "Failed to initialize MCP tools"
-            };
-            return;
-        }
-
-        ctx.response.body = {
-            success: true,
-            toolsCount: openAiTools.length,
-            message: "Server initialized successfully"
-        };
-    } catch (error) {
-        console.error(`Error initializing server: ${error instanceof Error ? error.message : "Unknown error"}`);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            error: "Failed to initialize server"
-        };
-    }
-});
 
 // Add endpoint for taking a screenshot
 router.get("/screenshot", authMiddleware, async (ctx) => {

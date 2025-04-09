@@ -1,13 +1,15 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { Client } from "npm:@modelcontextprotocol/sdk@1.9.0/client/index.js";
+import { SSEClientTransport } from "npm:@modelcontextprotocol/sdk@1.9.0/client/sse.js";
 import { MCP_SERVER_URL } from "./env.ts";
 
 // Create a proper URL object from the string
-console.log(`Creating URL object for MCP server: ${MCP_SERVER_URL}`);
-const sseUrl = new URL(MCP_SERVER_URL);
+const sseUrlString = MCP_SERVER_URL;
+
+const sseUrl = new URL(sseUrlString);
 
 // Create the transport with the URL object
 console.log(`Connecting to MCP server via SSE at: ${sseUrl.href}`);
+
 const transport = new SSEClientTransport(sseUrl);
 
 // Print out the transport object to debug

@@ -31,7 +31,7 @@ services:
     environment:
       # This ensures the container uses the correct hostname for the Firebase emulator
       - FIREBASE_EMULATOR_HOST=firebase
-      # Connect to Playwright SSE server
+      # Connect to Playwright SSE server - Using container name instead of localhost
       - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/sse
     volumes:
       - ./src:/app/src  # For development hot-reloading
@@ -60,17 +60,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sse
-    image: mcp-playwright-see-server:latest
+    image: mcp-playwright-sse-server:latest
     container_name: playwright-sse-mcp-server
     restart: ${RESTART_POLICY:-no}
     ports:
       - "${PORT:-3003}:${PORT:-3003}"
-    env_file:
-      - .env.development
     environment:
-      - USER_DATA_DIR=/app/user-data-dir
+      - PORT=3003
+      - USER_DATA_DIR=/app/user-data
+    # Adding a volume for Playwright browser data persistence
     volumes:
-      - playwright-profile-data:/app/user-data-dir
+      - ./mcp-playwright-sse-server/src:/app/src:ro  # Mount source for development
+      - playwright-user-data:/app/user-data  # Persistent browser profiles
     networks:
       - app-network
 
@@ -79,4 +80,4 @@ networks:
     driver: bridge
 
 volumes:
-  playwright-profile-data: 
+  playwright-user-data:  # For browser profile persistence 

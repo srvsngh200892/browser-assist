@@ -322,8 +322,6 @@ function App() {
             // Initialize tools with a small delay
             setTimeout(async () => {
                 try {
-                    await axios.get(`${SERVER_URL}/init`);
-
                     // Set stream status to waiting - this will trigger auto-start
                     console.log('INIT DEBUG: Setting stream status to waiting to trigger auto-start');
                     setStreamStatus('waiting');
@@ -523,9 +521,6 @@ function App() {
                         console.log('INIT DEBUG: Initializing tools...');
                         setTimeout(async () => {
                             try {
-                                await axios.get(`${SERVER_URL}/init`);
-
-                                // Set stream status to waiting - this will trigger auto-start
                                 console.log('INIT DEBUG: Setting stream status to waiting to trigger auto-start');
                                 setStreamStatus('waiting');
 

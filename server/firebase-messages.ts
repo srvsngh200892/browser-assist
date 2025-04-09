@@ -75,24 +75,7 @@ const MAX_CHUNK_SIZE = 800 * 1024; // 800KB per chunk for safety
 
 // Collection references
 const MESSAGES_COLLECTION = "messages";
-const SESSIONS_COLLECTION = "sessions";
 const MESSAGE_CHUNKS_COLLECTION = "message_chunks";
-
-// Initialize Firebase
-export async function initFirebase() {
-    try {
-        if (USE_FIREBASE_EMULATOR) {
-            console.log("Firebase emulator initialized successfully");
-            console.log(`Firestore configured with: cache size ${FIRESTORE_CACHE_SIZE_MB}MB, max connections: ${FIRESTORE_MAX_CONCURRENT_CONNECTIONS}, persistence: ${FIRESTORE_PERSISTENCE}`);
-        } else {
-            console.log("Firebase cloud initialized successfully");
-        }
-        return true;
-    } catch (error) {
-        console.error("Failed to initialize Firebase:", error);
-        return false;
-    }
-}
 
 // Helper to estimate the size of a message
 function estimateMessageSize(message: any): number {

@@ -14,14 +14,23 @@ RUN mkdir -p /app/node_modules && chown -R node:node /app
 
 USER node
 
+# Copy package files first for better caching
 COPY --chown=node:node mcp-playwright-sse-server/package*.json ./
+COPY --chown=node:node mcp-playwright-sse-server/tsconfig.json ./
 
+# Install dependencies
 RUN npm install
 
-COPY --chown=node:node mcp-playwright-sse-server/ ./src/
+# Copy source files, maintaining the correct directory structure
+COPY --chown=node:node mcp-playwright-sse-server/src/ ./src/
 
+# Build TypeScript code during image build
+RUN npm run build
+
+# Install browser
 RUN npx playwright install chromium
 
 EXPOSE 3003
 
-CMD ["npm", "start"]
+# Start the server with the compiled JS (no need to rebuild)
+CMD ["node", "dist/server.js"]
