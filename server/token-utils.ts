@@ -74,7 +74,7 @@ export function estimateTokenCount(messages: MessageType[]): number {
  * @param openai OpenAI client instance
  * @returns A string containing the summary
  */
-export async function summarizeConversation(messages: MessageType[], openai: any, model: string): Promise<string> {
+export async function summarizeConversation(messages: MessageType[], openai: any, model: string, timeout: number): Promise<string> {
     try {
         console.log("Generating conversation summary due to approaching token limit...");
         // Create a summarization request
@@ -88,7 +88,8 @@ export async function summarizeConversation(messages: MessageType[], openai: any
                 }
             ],
             temperature: 0.3,
-            max_tokens: 1000
+            max_tokens: 1000,
+            timeout: timeout
         });
         return summaryResponse.choices[0].message.content ||
             "Conversation summarized due to length. Previous details condensed.";

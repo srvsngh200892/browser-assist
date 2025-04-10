@@ -8,7 +8,7 @@ import {
     isDone,
     mapToolListToOpenAiTools,
 } from "./openai-utils.ts";
-import { OPENAI_API_KEY, OPENAI_MODEL } from "./env.ts";
+import { OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TIMEOUT } from "./env.ts";
 import { MessageHandler, type MessageType } from "./messages.ts";
 import { performNextStepSystemPrompt } from "./prompts.ts";
 import { randomUUID } from "node:crypto";
@@ -23,6 +23,7 @@ import {
     setStreamState,
     getStreamState,
     clearStreamState,
+    deleteSession,
     StreamState
 } from "./firebase-sessions.ts";
 
@@ -30,6 +31,16 @@ import { createUser, getUserByEmail, validateUser } from "./firebase-users.ts";
 import { authMiddleware } from "./auth-middleware.ts";
 import { createToken } from "./jwt-utils.ts";
 import { estimateTokenCount, summarizeConversation, createSummarizedMessages, MAX_TOKEN_LIMIT, TOKEN_THRESHOLD } from "./token-utils.ts";
+
+// Import Firestore functions
+import {
+    collection,
+    query,
+    where,
+    orderBy,
+    getDocs,
+} from "firebase/firestore";
+import { db } from "./firebase-messages.ts";
 
 // Define HTTP server constants
 const PORT = 3001;
@@ -548,11 +559,14 @@ router.post("/chat/:sessionId", authMiddleware, async (ctx) => {
 // Function to process responses asynchronously
 async function processResponse(sessionId: string, messageHandler: MessageHandler) {
     try {
+        // Get or create an MCP client for this session
+
+
         // Process with agent loop
-        // Continue processing until the agent indicates completion
         const maxIterations = Number.MAX_SAFE_INTEGER;
         let summarizationApplied = false;
         const mcpToolsList = await mcpClient.listTools();
+        console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
         const openAiTools = mapToolListToOpenAiTools(mcpToolsList);
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -569,7 +583,7 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
                     console.log(`Token limit threshold reached (${estimatedTokens} tokens). Summarizing conversation...`);
 
                     // Generate a summary of the conversation so far
-                    const summary = await summarizeConversation(messages, openai, OPENAI_MODEL);
+                    const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                     // Create summarized messages with our utility function
                     const summarizedMessages = createSummarizedMessages(messages, summary);
@@ -600,11 +614,13 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
 
                 try {
                     // Make the API call with current messages
+                    console.log(`in this side try`);
                     const response = await openai.chat.completions.create({
                         model: OPENAI_MODEL,
                         temperature: 0.2,
                         messages: messages,
-                        tools: openAiTools
+                        tools: openAiTools,
+                        timeout: OPENAI_TIMEOUT
                     });
                     console.log(`Using ${openAiTools.length} tools for agent processing`);
 
@@ -620,14 +636,15 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
                     await messageHandler.addMessage(assistantMessage);
 
                     if (isDone(response)) {
-                        console.log("Agent loop is Done");
-                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL);
+                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
                         const summarizedMessages = createSummarizedMessages(messages, summary);
                         messageHandler.setMessages(summarizedMessages);
+                        console.log(`Agent loop is Done for session ${sessionId}`);
+
                         break;
                     }
 
-                    const toolCallResponse = await applyToolCallsIfPresent(response);
+                    const toolCallResponse = await applyToolCallsIfPresent(response, mcpClient);
 
                     if (toolCallResponse.length) {
                         await messageHandler.addMessages(toolCallResponse);
@@ -641,7 +658,7 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
 
                         // Force summarization on token limit errors
                         const messages = await messageHandler.getMessages();
-                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL);
+                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                         // Create summarized messages with our utility function
                         const summarizedMessages = createSummarizedMessages(messages, summary);
@@ -663,44 +680,25 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
                     }
                 }
 
-            } catch (iterationError) {
-                console.error(`Error in agent loop iteration ${iteration + 1}:`, iterationError);
-
+            } catch (error) {
                 // Add a system message about the error
                 await messageHandler.addMessage({
                     role: "system",
-                    content: `Error during processing iteration ${iteration + 1}: ${iterationError.message || "Unknown error"}`
+                    content: `Error during processing request ${error.message || "Unknown error"}`
                 } as MessageType);
-
-                // If we've had multiple errors, possibly related to token limits
-                if (iteration > 2 && iterationError.message && iterationError.message.includes("token")) {
-                    // Force a reset with summary to try to recover
-                    await messageHandler.resetToInitialWithLastAssistantMessage();
-                    console.log("Reset to initial state with last assistant message due to persistent errors");
-
-                    // Add an explanation message
-                    await messageHandler.addMessage({
-                        role: "system",
-                        content: "The conversation has been reset to its initial state with the last assistant message due to persistent errors, possibly related to token limits."
-                    });
-
-                    // Break the loop if we can't recover
-                    if (iteration > 5) {
-                        console.error("Too many iterations with errors, breaking out of processing loop");
-                        break;
-                    }
-                }
+                throw error;
             }
         }
-        console.log("Processing complete");
+        console.log(`Processing complete for session ${sessionId}`);
     } catch (error) {
-        console.error(`Error in async processing: ${error instanceof Error ? error.message : "Unknown error"}`);
+        console.error(`Error in async processing for session ${sessionId}: ${error instanceof Error ? error.message : "Unknown error"}`);
 
         // Add error to message handler
         await messageHandler.addMessage({
             role: "system",
             content: `Error processing message: ${error instanceof Error ? error.message : "Unknown error"}`
         });
+
     }
 }
 
@@ -708,6 +706,9 @@ async function processResponse(sessionId: string, messageHandler: MessageHandler
 // Add endpoint for taking a screenshot
 router.get("/screenshot", authMiddleware, async (ctx) => {
     try {
+        // Get the sessionId from the query parameter
+        const sessionId = ctx.request.url.searchParams.get("sessionId") || "global";
+
         let screenshot;
         let mimeType = 'image/png';
         let statusMessage = "Success";
@@ -733,11 +734,11 @@ router.get("/screenshot", authMiddleware, async (ctx) => {
             mimeType = imageContent.mimeType || 'image/png';
 
             // Add debugging to check screenshot content
-            console.log(`MCP Screenshot captured: ${screenshot ? 'Success' : 'Empty'}`);
+            console.log(`MCP Screenshot captured for session ${sessionId}: ${screenshot ? 'Success' : 'Empty'}`);
             console.log(`MCP Screenshot size: ${screenshot ? screenshot.length : 0} bytes`);
             console.log(`MCP Screenshot type: ${mimeType}`);
         } catch (error) {
-            console.error("Screenshot error:", error);
+            console.error(`Screenshot error for session ${sessionId}:`, error);
             statusMessage = `Error: ${error.message || "Unknown error"}`;
 
             // Generate a fallback SVG
@@ -773,7 +774,8 @@ router.get("/screenshot", authMiddleware, async (ctx) => {
             success: true,
             image: `data:${mimeType};base64,${screenshot}`,
             timestamp: Date.now(),
-            status: statusMessage
+            status: statusMessage,
+            sessionId: sessionId
         };
     } catch (error) {
         console.error("Screenshot endpoint error:", error);
@@ -825,6 +827,7 @@ router.get("/browser-stream/:sessionId", async (ctx) => {
     }
 
     try {
+
         // Setup Server-Sent Events
         console.log(`Browser stream request received for session ${sessionId}`);
 
@@ -963,7 +966,7 @@ router.get("/browser-stream/:sessionId", async (ctx) => {
                     }
 
                     try {
-                        // Call MCP for screenshot
+                        // Call MCP for screenshot using the session-specific client
                         const result = await mcpClient.callTool({
                             name: "browser_take_screenshot",
                             arguments: {}
@@ -1076,6 +1079,7 @@ router.get("/browser-stream/:sessionId", async (ctx) => {
 
                 // Start sending screenshots
                 sendScreenshot();
+
                 // Handle client disconnection
                 if (ctx.req) {
                     ctx.req.on("close", async () => {
@@ -1274,6 +1278,298 @@ router.post("/auth/register", async (ctx) => {
         console.error("Registration error:", error);
         ctx.response.status = 500;
         ctx.response.body = { success: false, error: "Server error" };
+    }
+});
+
+// Logout endpoint
+router.post("/logout", authMiddleware, async (ctx) => {
+    try {
+        const body = await ctx.request.body().value;
+        const { sessionId, deleteData = false } = body;
+
+        if (!sessionId) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                error: "Session ID is required for logout"
+            };
+            return;
+        }
+
+        console.log(`Processing logout request for session: ${sessionId}${deleteData ? ' (with data deletion)' : ''}`);
+
+        // Get user information from the auth middleware
+        const user = ctx.state.user;
+        if (!user || !user.userId) {
+            ctx.response.status = 401;
+            ctx.response.body = {
+                success: false,
+                error: "Authentication required"
+            };
+            return;
+        }
+
+        // Verify session exists and belongs to this user
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+            ctx.response.status = 404;
+            ctx.response.body = {
+                success: false,
+                error: "Session not found"
+            };
+            return;
+        }
+
+        // Verify this user owns the session
+        if (sessionData.userId !== user.userId) {
+            ctx.response.status = 403;
+            ctx.response.body = {
+                success: false,
+                error: "You do not have permission to logout of this session"
+            };
+            return;
+        }
+
+        // 1. Clear any stream state
+        try {
+            await clearStreamState(sessionId);
+            console.log(`Cleared stream state for session ${sessionId}`);
+        } catch (streamError) {
+            console.error(`Error clearing stream state for session ${sessionId}:`, streamError);
+            // Continue with other cleanup even if stream state clear fails
+        }
+
+        // 3. Remove message handler from memory
+        if (sessions.has(sessionId)) {
+            sessions.delete(sessionId);
+            console.log(`Removed message handler for session ${sessionId}`);
+        }
+
+        // 4. Handle the session in Firebase based on deletion preference
+        if (deleteData) {
+            // Delete session data completely if requested
+            const deleteResult = await deleteSession(sessionId);
+            if (deleteResult) {
+                console.log(`Session ${sessionId} and all associated data deleted`);
+            } else {
+                console.error(`Failed to delete session ${sessionId} data`);
+            }
+        } else {
+            // Otherwise just mark it as inactive
+            await updateSessionActivity(sessionId, false);
+            console.log(`Marked session ${sessionId} as inactive`);
+        }
+
+        ctx.response.body = {
+            success: true,
+            message: deleteData
+                ? "Logout successful, session and data have been deleted"
+                : "Logout successful, session marked as inactive"
+        };
+    } catch (error) {
+        console.error(`Logout error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            error: "Server error during logout"
+        };
+    }
+});
+
+// Endpoint to get user sessions
+router.get("/user/sessions", authMiddleware, async (ctx) => {
+    try {
+        // Get user from auth middleware
+        const user = ctx.state.user;
+        if (!user || !user.userId) {
+            ctx.response.status = 401;
+            ctx.response.body = {
+                success: false,
+                error: "Authentication required"
+            };
+            return;
+        }
+
+        // Get sessions for this user from Firebase
+        // Create a query to find all sessions for this user
+        const sessionsCollectionRef = collection(db, "sessions");
+        const userSessionsQuery = query(
+            sessionsCollectionRef,
+            where("userId", "==", user.userId),
+            orderBy("lastActive", "desc") // Most recent first
+        );
+
+        const sessionsSnapshot = await getDocs(userSessionsQuery);
+
+        // Transform session data for the response
+        const userSessions = sessionsSnapshot.docs.map(doc => {
+            const data = doc.data();
+
+            // Convert Firestore timestamps to ISO strings for the client
+            let createdAt = "unknown";
+            let lastActive = "unknown";
+
+            if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                createdAt = data.createdAt.toDate().toISOString();
+            }
+
+            if (data.lastActive && typeof data.lastActive.toDate === 'function') {
+                lastActive = data.lastActive.toDate().toISOString();
+            }
+
+            // Build the session data for response
+            return {
+                sessionId: doc.id,
+                status: data.status || 'active',
+                createdAt,
+                lastActive,
+                metadata: data.metadata || {},
+                browser: data.browser || null
+            };
+        });
+
+        ctx.response.body = {
+            success: true,
+            sessions: userSessions,
+            count: userSessions.length
+        };
+    } catch (error) {
+        console.error(`Error getting user sessions: ${error instanceof Error ? error.message : "Unknown error"}`);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            error: "Server error fetching user sessions"
+        };
+    }
+});
+
+// Endpoint to delete multiple sessions
+router.post("/user/sessions/delete", authMiddleware, async (ctx) => {
+    try {
+        // Get user from auth middleware
+        const user = ctx.state.user;
+        if (!user || !user.userId) {
+            ctx.response.status = 401;
+            ctx.response.body = {
+                success: false,
+                error: "Authentication required"
+            };
+            return;
+        }
+
+        // Get session IDs to delete from request body
+        const body = await ctx.request.body().value;
+        const { sessionIds } = body;
+
+        if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                error: "Please provide an array of session IDs to delete"
+            };
+            return;
+        }
+
+        // Verify user ownership of each session
+        const verifiedSessionIds: string[] = [];
+        const failedSessionIds: { sessionId: string, reason: string }[] = [];
+
+        // Check each session ID
+        for (const sessionId of sessionIds) {
+            try {
+                // Get session metadata
+                const sessionData = await getSessionMetadata(sessionId);
+
+                // Check if session exists
+                if (!sessionData) {
+                    failedSessionIds.push({
+                        sessionId,
+                        reason: "Session not found"
+                    });
+                    continue;
+                }
+
+                // Check if user owns this session
+                if (sessionData.userId !== user.userId) {
+                    failedSessionIds.push({
+                        sessionId,
+                        reason: "You do not have permission to delete this session"
+                    });
+                    continue;
+                }
+
+                // Session is verified for deletion
+                verifiedSessionIds.push(sessionId);
+            } catch (error) {
+                failedSessionIds.push({
+                    sessionId,
+                    reason: `Error verifying session: ${error instanceof Error ? error.message : "Unknown error"}`
+                });
+            }
+        }
+
+        // Process verified sessions
+        const results: { sessionId: string, success: boolean, error?: string }[] = [];
+
+        for (const sessionId of verifiedSessionIds) {
+            try {
+
+                // 1. Clear any stream state
+                try {
+                    await clearStreamState(sessionId);
+                } catch (streamError) {
+                    console.error(`Error clearing stream state for session ${sessionId}:`, streamError);
+                    // Continue with deletion anyway
+                }
+
+                // 2. Remove message handler from memory
+                if (sessions.has(sessionId)) {
+                    sessions.delete(sessionId);
+                }
+
+                // 3. Delete session data
+                const deleted = await deleteSession(sessionId);
+
+                results.push({
+                    sessionId,
+                    success: deleted,
+                    error: deleted ? undefined : "Failed to delete session data"
+                });
+            } catch (deleteError) {
+                results.push({
+                    sessionId,
+                    success: false,
+                    error: `Error during deletion: ${deleteError instanceof Error ? deleteError.message : "Unknown error"}`
+                });
+            }
+        }
+
+        // Return the results
+        const successCount = results.filter(r => r.success).length;
+
+        ctx.response.body = {
+            success: true,
+            message: `Deleted ${successCount} out of ${sessionIds.length} sessions`,
+            results: {
+                successful: results.filter(r => r.success),
+                failed: results.filter(r => !r.success),
+                notAttempted: failedSessionIds
+            },
+            summary: {
+                requested: sessionIds.length,
+                verified: verifiedSessionIds.length,
+                successful: successCount,
+                failed: results.filter(r => !r.success).length,
+                notAttempted: failedSessionIds.length
+            }
+        };
+    } catch (error) {
+        console.error(`Error in batch session deletion: ${error instanceof Error ? error.message : "Unknown error"}`);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            error: "Server error deleting sessions"
+        };
     }
 });
 

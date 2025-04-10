@@ -1,7 +1,7 @@
 import OpenAI from "npm:openai@4.76.1";
 import { callTool } from "./mcp.ts";
-import { mcpClient } from "./client.ts";
 import type { MessageType } from "./messages.ts";
+import { Client } from "npm:@modelcontextprotocol/sdk@1.9.0/client/index.js";
 
 type OpenAiToolsInputType = {
   type: "function";
@@ -40,11 +40,13 @@ export const mapToolListToOpenAiTools = (
 
 /**
  * Applies the tool call(s) if they exists in the response and returns the result as a message to append
- * @param response
- * @returns
+ * @param response - The OpenAI chat completion response
+ * @param mcpClient - The MCP client to use for tool calls
+ * @returns Array of messages generated from tool calls
  */
 export const applyToolCallsIfPresent = async (
-  response: OpenAI.Chat.Completions.ChatCompletion
+  response: OpenAI.Chat.Completions.ChatCompletion,
+  mcpClient: Client
 ): Promise<MessageType[]> => {
   if (!response.choices?.[0]?.message?.tool_calls?.length) {
     return [];

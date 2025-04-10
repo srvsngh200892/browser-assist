@@ -9,6 +9,7 @@ const MCP_SERVER_URL = Deno.env.get("MCP_SERVER_URL") || "http://localhost:3003/
 
 const DEBUG = Deno.env.get("DEBUG") === "true";
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
+const OPENAI_TIMEOUT = parseInt(Deno.env.get("OPENAI_TIMEOUT") || 20, 10);
 
 // Firebase Configuration
 const FIREBASE_API_KEY = Deno.env.get("FIREBASE_API_KEY") || "";
@@ -49,6 +50,7 @@ export {
   MCP_SERVER_URL,
   DEBUG,
   OPENAI_MODEL,
+  OPENAI_TIMEOUT,
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
   FIREBASE_PROJECT_ID,

@@ -8,7 +8,9 @@ import {
     where,
     orderBy,
     serverTimestamp,
-    Timestamp
+    Timestamp,
+    deleteDoc,
+    writeBatch
 } from "firebase/firestore";
 import { db } from "./firebase-messages.ts";
 
@@ -160,7 +162,7 @@ export async function sessionExists(sessionId: string): Promise<boolean> {
 }
 
 // Update session activity timestamp
-export async function updateSessionActivity(sessionId: string): Promise<boolean> {
+export async function updateSessionActivity(sessionId: string, isActive: boolean = true): Promise<boolean> {
     try {
         const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
         const sessionDoc = await getDoc(sessionRef);
@@ -173,13 +175,14 @@ export async function updateSessionActivity(sessionId: string): Promise<boolean>
         // Get existing session data to ensure we preserve it
         const existingData = sessionDoc.data();
 
-        // Update only the lastActive field and preserve all other fields
+        // Update the lastActive field and status based on isActive parameter
         await setDoc(sessionRef, {
             ...existingData,
-            lastActive: serverTimestamp()
+            lastActive: serverTimestamp(),
+            status: isActive ? 'active' : 'inactive'
         }, { merge: true });
 
-        console.log(`Session ${sessionId} activity timestamp updated`);
+        console.log(`Session ${sessionId} activity updated. Status: ${isActive ? 'active' : 'inactive'}`);
         return true;
     } catch (error) {
         console.error(`Error updating session activity for ${sessionId}:`, error);
@@ -276,6 +279,60 @@ export async function clearStreamState(sessionId: string): Promise<boolean> {
         return true;
     } catch (error) {
         console.error(`Error clearing stream state for ${sessionId}:`, error);
+        return false;
+    }
+}
+
+// Delete a session and all its associated data
+export async function deleteSession(sessionId: string): Promise<boolean> {
+    try {
+        // Get a reference to the session document
+        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
+        const sessionDoc = await getDoc(sessionRef);
+
+        if (!sessionDoc.exists()) {
+            console.log(`Cannot delete non-existent session: ${sessionId}`);
+            return false;
+        }
+
+        // Delete the session document
+        await deleteDoc(sessionRef);
+
+        // Delete all messages for this session
+        const messagesCollectionRef = collection(db, "messages");
+        const messagesQuery = query(messagesCollectionRef, where("sessionId", "==", sessionId));
+        const messagesSnapshot = await getDocs(messagesQuery);
+
+        // Count messages to be deleted
+        const messageCount = messagesSnapshot.size;
+
+        // Create a batch for bulk deletion (Firestore limits batches to 500 operations)
+        const MAX_BATCH_SIZE = 400; // Leave some room for other operations
+        let currentBatch = writeBatch(db);
+        let operationCount = 0;
+
+        // Add delete operations to batch
+        for (const messageDoc of messagesSnapshot.docs) {
+            currentBatch.delete(messageDoc.ref);
+            operationCount++;
+
+            // If we've reached the limit, commit this batch and start a new one
+            if (operationCount >= MAX_BATCH_SIZE) {
+                await currentBatch.commit();
+                currentBatch = writeBatch(db);
+                operationCount = 0;
+            }
+        }
+
+        // Commit any remaining operations
+        if (operationCount > 0) {
+            await currentBatch.commit();
+        }
+
+        console.log(`Session ${sessionId} and ${messageCount} messages deleted successfully`);
+        return true;
+    } catch (error) {
+        console.error(`Error deleting session ${sessionId}:`, error);
         return false;
     }
 } 
