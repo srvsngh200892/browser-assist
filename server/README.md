@@ -32,10 +32,10 @@ npm install
 
 ## Configuration
 
-1. Copy the `.env` file from `src/.env` to the project root:
+1. Copy the `.env.example` file from `src/.env.example` to the project root:
 
 ```bash
-cp src/.env .env
+cp src/.env.example /src/.env
 ```
 
 2. Update the environment variables in the `.env` file with your own values:
@@ -113,8 +113,8 @@ npm start
 
 ### Utility
 
-- `GET /health` - Health check endpoint
-- `GET /ping` - Simple ping endpoint
+- `GET /api/health` - Health check endpoint
+- `GET /api/ping` - Simple ping endpoint
 
 ## Testing
 

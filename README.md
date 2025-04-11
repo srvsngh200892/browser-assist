@@ -1,149 +1,142 @@
 # Browser Assist
 
-A real-time streaming client for browser automation that provides screenshot streaming capabilities with Firebase-backed session and message management.
+Browser Assist is an intelligent browser automation companion that provides AI-powered assistance for web browsing tasks. It uses OpenAI's models and Firebase for data persistence, all running in a containerized environment with Docker.
 
 ## Features
 
-- Real-time browser streaming via Server-Sent Events (SSE)
-- Firebase integration for persistent message and session storage
-- Real-time message updates with Firebase
-- Firebase emulator support for local development
-- WebSocket-based notifications using Socket.IO
-- Playwright WebKit browser integration
-- Interactive UI with real-time status updates
-- Screenshot capability
-
-## Prerequisites
-
-- [Deno](https://deno.com/runtime) (for the server)
-- [Node.js](https://nodejs.org/) (for the UI)
-- WebKit browser (installed via the provided script)
-- [Firebase Project](https://console.firebase.google.com/) (for message storage and session management)
-- [Firebase CLI](https://firebase.google.com/docs/cli) (optional, for local emulators)
-
-## Firebase Setup
-
-Before running the application, you need to set up Firebase:
-
-1. Create a Firebase project at https://console.firebase.google.com/
-2. Set up Firestore Database in test mode
-3. Register a web app in your Firebase project
-4. Copy your Firebase configuration to the `.env` file
-5. See `.env.firebase` for detailed setup instructions
-
-## Quick Start
-
-For the easiest setup, use the start-all script:
-
-```bash
-# Make scripts executable
-chmod +x *.sh
-
-# Configure your Firebase settings in .env
-# See .env.example and .env.firebase for guidance
-
-# Run the start-all script
-./deploy.sh build
-
-# Or run with Firebase emulators for local development
-./deploy.sh dev
-```
-
-This will:
-1. Check and install WebKit if needed
-2. Start Firebase emulators if the `--emulators` flag is used
-3. Start the server on port 3001
-4. Start the UI on port 3002
-
-## Firebase Development with Emulators
-
-For local development without requiring a Firebase cloud project, you can use Firebase emulators:
-
-```bash
-# Start the application with emulators
- firebase emulators:start --project demo-local
-```
-
-This enables offline development with local Firestore emulation. See [FIREBASE-EMULATOR.md](FIREBASE-EMULATOR.md) for detailed instructions on setting up and using emulators.
-
-## Manual Setup
-
-### Server Setup
-
-```bash
-# Install server dependencies
-deno cache --reload server/server.ts
-
-# Configure your Firebase settings in .env
-# See .env.example and .env.firebase for guidance
-
-# Start the server
-deno task server
-```
-
-The server will run on http://127.0.0.1:3001
-
-### UI Setup
-
-```bash
-# Navigate to UI directory
-cd ui
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-The UI will run on http://127.0.0.1:3002
-
-
-## Troubleshooting
-
-If you encounter issues, you can:
-
-1. Run the diagnostic script:
-   ```bash
-   ./diagnose.sh
-   ```
-
-2. Check common issues:
-   - Make sure both server and UI are running
-   - Ensure WebKit browser is installed
-   - Check if the server is accessible at http://127.0.0.1:3001/ping
-   - Check if the UI is accessible at http://127.0.0.1:3002
-   - Verify Firebase configuration in your `.env` file
-
-
-## API Endpoints
-
-- `/session` - Create a new session
-- `/chat/:sessionId` - Send a message in a session
-- `/messages/:sessionId` - Get messages for a session (supports `since` timestamp parameter)
-- `/browser-stream/:sessionId` - Stream browser screenshots
-- `/screenshot` - Manually request a screenshot
-- `/status` - Check server status
-- `/ping` - Simple health check
+- Real-time browser streaming with screenshots
+- AI-powered assistance using OpenAI models
+- Firebase integration for data persistence
+- User authentication and session management
+- Docker-based deployment for easy setup
 
 ## Architecture
 
-The application consists of:
+The project consists of several components:
 
-1. **Backend Server** (Deno/Oak)
-   - Handles API requests
-   - Manages browser automation
-   - Provides real-time streaming
-   - Integrates with Firebase for data persistence
+- **UI**: React-based frontend
+- **Server**: Express.js backend with TypeScript
+- **Firebase**: Used for data persistence and authentication
+- **MCP (Model Context Protocol)**: Used for browser automation
 
-2. **Frontend UI** (React)
-   - Interactive chat interface
-   - Browser stream visualization
-   - Status monitoring
+## Prerequisites
 
-3. **Firebase**
-   - Stores session data
-   - Provides persistent message storage
-   - Enables real-time updates
+- Docker and Docker Compose
+- Node.js 18+
+- OpenAI API key
+- Firebase project (or Firebase emulator for development)
 
-# browser-assist
+## Getting Started
+
+### Environment Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/srvsngh200892/browser-assist.git
+cd browser-assist
+```
+
+2. Create a `.env` file in the root directory with the following variables:
+```
+# Server Configuration
+PORT=3001
+HOST=0.0.0.0
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini
+DEBUG=true
+
+# Firebase Configuration
+FIREBASE_API_KEY=your_firebase_api_key
+FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+FIREBASE_APP_ID=your_firebase_app_id
+
+# Firebase Emulator (for development)
+USE_FIREBASE_EMULATOR=true
+FIREBASE_EMULATOR_HOST=firebase
+FIREBASE_EMULATOR_PORT=8080
+
+# MCP Configuration
+MCP_SERVER_URL=http://localhost:3003/sse
+```
+
+### Running with Docker
+
+1. Start all services:
+```bash
+docker-compose up -d
+```
+
+2. View logs:
+```bash
+docker-compose logs -f
+```
+
+3. Access the application:
+   - UI: http://localhost:3002
+   - Server API: http://localhost:3001
+   - Firebase Emulator: http://localhost:8080
+   - MCP Server: http://localhost:3003
+
+### Development
+
+#### UI Development
+
+The UI is a React application with proxy configuration for API requests:
+
+```bash
+cd ui
+npm install
+npm start
+```
+
+#### Server Development
+
+The server is a TypeScript Express application:
+
+```bash
+cd server
+npm install
+npm run dev
+```
+
+## API Endpoints
+
+### Session Management
+
+- `POST /api/session`: Create a new session
+- `GET /api/sessions`: Get all session IDs
+- `GET /api/session/:sessionId`: Get session details
+
+### Authentication
+
+- `POST /api/auth/login`: User login
+- `POST /api/auth/register`: User registration
+- `POST /api/logout`: User logout
+
+### Browser Streaming
+
+- `GET /api/browser-stream/:sessionId`: Get real-time browser screenshots
+- `POST /api/stream-control`: Control streaming (pause/resume)
+- `POST /api/stream-disconnect`: Disconnect from a stream
+
+## Troubleshooting
+
+### CORS Issues
+
+If you encounter CORS issues, check:
+1. The server's CORS configuration in `server/src/server.ts`
+2. The proxy configuration in `ui/src/setupProxy.js`
+3. Ensure proper headers for SSE connections
+
+### Docker Network Issues
+
+If containers can't communicate:
+1. Check the Docker network configuration in `docker-compose.yml`
+2. Ensure environment variables are properly set for each service
+3. Restart the Docker containers with `docker-compose down && docker-compose up -d`
+
+## License
+
