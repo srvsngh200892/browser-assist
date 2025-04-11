@@ -1126,7 +1126,7 @@ function App() {
             // For other messages, prefer ID if available
             const key = msg.id ?
                 `${msg.role}:${msg.id}` :
-                `${msg.role}:${msg.content?.substring(0, 100)}`;
+                `${msg.role}:${msg.created_at || Date.now()}`;
 
             // If we haven't seen this message yet, add it to the result
             if (!seen.has(key)) {
