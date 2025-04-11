@@ -2,7 +2,7 @@
 // Replace with actual implementation
 
 import { MessageHandler } from './messages';
-import { openai } from '../server';
+import { openaiClient } from '../server';
 import { mcpClient } from '../utils/client';
 import {
     applyToolCallsIfPresent,
@@ -55,7 +55,7 @@ export // Function to process responses asynchronously
                     console.log(`Token limit threshold reached (${estimatedTokens} tokens). Summarizing conversation...`);
 
                     // Generate a summary of the conversation so far
-                    const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
+                    const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                     // Create summarized messages with our utility function
                     const summarizedMessages = createSummarizedMessages(messages, summary);
@@ -87,7 +87,7 @@ export // Function to process responses asynchronously
                 try {
                     // Make the API call with current messages
                     console.log(`in this side try`);
-                    const response = await openai.chat.completions.create({
+                    const response = await openaiClient.chat.completions.create({
                         model: OPENAI_MODEL,
                         temperature: 0.2,
                         messages: messages as any, // Cast to any to fix type error
@@ -107,7 +107,7 @@ export // Function to process responses asynchronously
                     await messageHandler.addMessage(assistantMessage);
 
                     if (isDone(response)) {
-                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
+                        const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
                         const summarizedMessages = createSummarizedMessages(messages, summary);
                         messageHandler.setMessages(summarizedMessages);
                         console.log(`Agent loop is Done for session ${sessionId}`);
@@ -129,7 +129,7 @@ export // Function to process responses asynchronously
 
                         // Force summarization on token limit errors
                         const messages = await messageHandler.getMessages();
-                        const summary = await summarizeConversation(messages, openai, OPENAI_MODEL, OPENAI_TIMEOUT);
+                        const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                         // Create summarized messages with our utility function
                         const summarizedMessages = createSummarizedMessages(messages, summary);

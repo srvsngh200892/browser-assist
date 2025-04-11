@@ -10,6 +10,7 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://openai.com";
 const MCP_SERVER_COMMAND = process.env.MCP_SERVER_COMMAND!;
 const MCP_SERVER_ARGS = JSON.parse(process.env.MCP_SERVER_ARGS || "[]")!;
 
@@ -52,6 +53,7 @@ export {
     PORT,
     HOST,
     OPENAI_API_KEY,
+    OPENAI_BASE_URL,
     MCP_SERVER_COMMAND,
     MCP_SERVER_ARGS,
     MCP_SERVER_URL,

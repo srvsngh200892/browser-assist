@@ -1,15 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
+import { openaiClient } from './utils/openai-client';
 
 // Import environment configuration
 import {
     PORT,
-    HOST,
-    OPENAI_API_KEY,
-    OPENAI_MODEL,
-    OPENAI_TIMEOUT
+    HOST
 } from './config/env';
 
 // Import message handler
@@ -79,12 +76,6 @@ app.use(async (req, res, next) => {
 
     // Proceed to next middleware
     next();
-});
-
-// Initialize OpenAI with a fallback key for testing if needed
-const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY || "sk-dummy-key-for-testing-purposes-only",
-    baseURL: `https://llm-dev.medable.tech`
 });
 
 // This will be initialized in the init endpoint
@@ -159,7 +150,7 @@ app.get("/api/ping", (_req, res) => {
 });
 
 // Export for external use (e.g., in tests)
-export { app, openai, openAiTools, getOrCreateMessageHandler };
+export { app, openaiClient, openAiTools, getOrCreateMessageHandler };
 
 // Start the server if this file is run directly
 if (require.main === module) {
