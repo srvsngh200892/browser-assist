@@ -16,6 +16,12 @@ services:
       - ./firebase-data:/app/firebase-data  # For data persistence
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Server service (Deno backend)
   server:
@@ -27,7 +33,7 @@ services:
     ports:
       - "3001:3001"
     env_file:
-      - .env.development
+      - ./server/src/.env
     environment:
       # This ensures the container uses the correct hostname for the Firebase emulator
       - FIREBASE_EMULATOR_HOST=firebase
@@ -74,6 +80,12 @@ services:
       - playwright-user-data:/app/user-data  # Persistent browser profiles
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   app-network:

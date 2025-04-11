@@ -30,7 +30,7 @@ const SessionInfo = ({ sessionId, onError }) => {
             try {
                 setLoading(true);
 
-                const response = await axios.get(`${SERVER_URL}/session/${sessionId}`);
+                const response = await axios.get(`${SERVER_URL}/api/session/${sessionId}`);
 
                 if (response.data.success) {
                     setSessionData(response.data.session);

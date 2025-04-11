@@ -196,7 +196,7 @@ function App() {
         if (!sessionIdRef.current) return;
 
         try {
-            const response = await axios.get(`${SERVER_URL}/screenshot`, {
+            const response = await axios.get(`${SERVER_URL}/api/screenshot`, {
                 params: { sessionId: sessionIdRef.current, _t: Date.now() }
             });
 
@@ -225,7 +225,7 @@ function App() {
                 // Notify server about disconnection
                 const currentSession = sessionIdRef.current;
                 if (currentSession) {
-                    axios.post(`${SERVER_URL}/stream-disconnect`, {
+                    axios.post(`${SERVER_URL}/api/stream-disconnect`, {
                         sessionId: currentSession,
                         timestamp: Date.now()
                     }).catch(err => {
@@ -257,27 +257,65 @@ function App() {
         }
     }, [setSessionId]);
 
-    const handleLogout = useCallback(() => {
-        // Clear all localStorage items
-        localStorage.clear();
-        setUser(null);
-        setIsAuthenticated(false);
-        setSessionId(null);
-        setMessages([
-            {
-                role: 'assistant',
-                content: 'You have been logged out. Please log in to continue.',
-                id: 'logout-message',
-                created_at: new Date().toISOString()
-            }
-        ]);
-        cleanupStream();
-    }, [cleanupStream]);
 
-    const getAuthHeaders = useCallback(() => {
-        const token = localStorage.getItem('auth_token');
-        return token ? { 'Authorization': `Bearer ${token}` } : {};
-    }, []);
+    const handleLogout = useCallback((deleteData = false) => {
+        // Get the current session ID
+        const currentSessionId = sessionIdRef.current;
+        console.log('LOGOUT DEBUG: Current session ID:', currentSessionId);
+
+        if (currentSessionId) {
+            // Call the server logout endpoint with only the necessary data
+            try {
+                axios.post(`${SERVER_URL}/api/logout`, {
+                    sessionId: currentSessionId,
+                    deleteData: !!deleteData // Ensure boolean
+                }, {
+                    // Add headers to ensure proper content type
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => {
+                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
+                }).catch(error => {
+                    // Log only the error message and status
+                    console.error('Error during server logout:', error.message || 'Unknown error');
+                }).finally(() => {
+                    // Continue with local cleanup regardless of server response
+                    performLocalLogout();
+                });
+            } catch (error) {
+                console.error('Error during logout process:', error.message || 'Unknown error');
+                performLocalLogout(); // Still clean up locally on error
+            }
+        } else {
+            // No session ID, just do local logout
+            performLocalLogout();
+        }
+
+        // Function to handle the local logout process
+        function performLocalLogout() {
+            // Clean up any active streams
+            cleanupStream();
+
+            // Clear all localStorage items
+            localStorage.clear();
+
+            // Reset app state
+            setUser(null);
+            setIsAuthenticated(false);
+            setSessionId(null);
+            setMessages([
+                {
+                    role: 'assistant',
+                    content: 'You have been logged out. Please log in to continue.',
+                    id: 'logout-message',
+                    created_at: new Date().toISOString()
+                }
+            ]);
+        }
+    }, [cleanupStream, SERVER_URL]);
+
+
 
     // Check for authentication on initial load
     useEffect(() => {
@@ -500,12 +538,8 @@ function App() {
                 createSession.attemptCount = (createSession.attemptCount || 0) + 1;
 
                 try {
-                    const response = await axios.post(`${SERVER_URL}/session`, {}, {
+                    const response = await axios.post(`${SERVER_URL}/api/session`, {}, {
                         timeout: 10000,  // 10 second timeout
-                        headers: {
-                            'X-Request-ID': `session-${Date.now()}`,  // Add unique request ID
-                            'X-Client-Version': '1.0.0'  // Add version for tracking
-                        }
                     });
 
                     if (response.data.success) {
@@ -604,7 +638,7 @@ function App() {
                 console.log('INIT DEBUG: Validating cached session:', cachedSession);
 
                 // Check if the session is still valid
-                axios.get(`${SERVER_URL}/health?sessionId=${cachedSession}`)
+                axios.get(`${SERVER_URL}/api/health?sessionId=${cachedSession}`)
                     .then(response => {
                         if (response.data && response.data.success) {
                             console.log('INIT DEBUG: Cached session is valid, using it');
@@ -641,16 +675,6 @@ function App() {
             if (streamSourceRef.current) streamSourceRef.current.close();
         };
     }, [isAuthenticated, setSessionId, setStreamStatus, takeScreenshot]); // Add isAuthenticated to dependencies
-
-    /**
-     * Find the last message with a specific role
-     */
-    const findLastMessage = useCallback((messages, role) => {
-        for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].role === role) return messages[i];
-        }
-        return null;
-    }, []);
 
     /**
      * Poll for message updates
@@ -697,7 +721,7 @@ function App() {
 
             // Get the last timestamp from localStorage if available
             const lastTimestamp = localStorage.getItem(`lastTimestamp-${sessionId}`);
-            let url = `${SERVER_URL}/messages/${sessionId}`;
+            let url = `${SERVER_URL}/api/messages/${sessionId}`;
 
             // Add timestamp parameter if we have a previous timestamp
             if (lastTimestamp) {
@@ -914,7 +938,7 @@ function App() {
 
                         // Let server know to pause sending updates (with error handling)
                         try {
-                            axios.post(`${SERVER_URL}/stream-control`, {
+                            axios.post(`${SERVER_URL}/api/stream-control`, {
                                 sessionId: sessionId,
                                 action: 'pause',
                                 reason: 'response_complete'
@@ -1099,18 +1123,6 @@ function App() {
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
 
-            // Special handling for user messages - use content as key
-            if (msg.role === 'user') {
-                const userKey = `user:${msg.content}`;
-                if (!seen.has(userKey)) {
-                    seen.set(userKey, true);
-                    result.push(msg);
-                } else {
-                    console.log('DEDUP: Removed duplicate user message:', msg.content?.substring(0, 20));
-                }
-                continue;
-            }
-
             // For other messages, prefer ID if available
             const key = msg.id ?
                 `${msg.role}:${msg.id}` :
@@ -1133,14 +1145,6 @@ function App() {
         return result;
     }, []);
 
-    /**
-     * Process server messages - no longer needed with Firebase
-     * Keeping as a no-op function to avoid changing all references
-     */
-    const processServerMessages = useCallback((serverMessages) => {
-        // Just return the server messages as-is, but perform deduplication
-        return deduplicateMessages(serverMessages);
-    }, [deduplicateMessages]);
 
     /**
      * Start polling when loading state changes
@@ -1290,12 +1294,8 @@ function App() {
             // Add a small delay to prevent rapid requests
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            const response = await axios.post(`${SERVER_URL}/session`, {}, {
+            const response = await axios.post(`${SERVER_URL}/api/session`, {}, {
                 timeout: 10000,  // 10 second timeout
-                headers: {
-                    'X-Request-ID': `expired-session-${Date.now()}`,  // Add unique request ID
-                    'X-Client-Version': '1.0.0'
-                }
             });
 
             if (response.data.success) {
@@ -1335,7 +1335,7 @@ function App() {
                         console.log('SESSION EXPIRED: Attempting to use cached session after rate limit:', cachedSession);
 
                         // Verify the cached session
-                        const verifyResponse = await axios.get(`${SERVER_URL}/health?sessionId=${cachedSession}`)
+                        const verifyResponse = await axios.get(`${SERVER_URL}/api/health?sessionId=${cachedSession}`)
                             .catch(e => null);
 
                         if (verifyResponse && verifyResponse.data && verifyResponse.data.success) {
@@ -1376,7 +1376,7 @@ function App() {
 
             // Notify server to resume sending data
             try {
-                axios.post(`${SERVER_URL}/stream-control`, {
+                axios.post(`${SERVER_URL}/api/stream-control`, {
                     sessionId: sessionId,
                     action: 'resume'
                 }).catch(err => console.log('Server may not support stream resuming yet'));
@@ -1454,19 +1454,7 @@ function App() {
             currentMessages.splice(welcomeIndex, 1);
         }
 
-        // Check for duplicate user message - don't add if it already exists
-        const hasDuplicateMessage = currentMessages.some(m =>
-            m.role === 'user' &&
-            m.content === message
-        );
-
-        if (hasDuplicateMessage) {
-            console.log('SEND: Skipping duplicate user message:', message.substring(0, 20));
-        } else {
-            // Add the user message only if it's not a duplicate
-            currentMessages.push(userMessage);
-            console.log('SEND: Added new user message to UI');
-        }
+        currentMessages.push(userMessage);
 
         // Clear any typing indicators
         const updatedMessages = currentMessages.filter(m => !m.is_typing);
@@ -1505,7 +1493,7 @@ function App() {
 
             // Send message to server
             console.log('SEND: Sending message to server');
-            await axios.post(`${SERVER_URL}/chat/${sessionId}`, {
+            await axios.post(`${SERVER_URL}/api/chat/${sessionId}`, {
                 message
             });
             console.log('SEND: Message sent successfully');
@@ -1624,173 +1612,124 @@ function App() {
             // Close any existing stream
             cleanupStream();
 
-            // First verify session is valid before attempting to stream
-            console.log('STREAM DEBUG: Verifying session is valid before streaming');
+            // Create EventSource directly without redundant health check
+            const streamUrl = `${SERVER_URL}/api/browser-stream/${sessionId}?_t=${Date.now()}`;
+            console.log('STREAM DEBUG: EventSource URL:', streamUrl);
 
-            axios.get(`${SERVER_URL}/health?sessionId=${sessionId}`)
-                .then(() => {
-                    console.log('STREAM DEBUG: Session verification successful, creating EventSource');
+            try {
+                const source = new EventSource(streamUrl);
+                console.log('STREAM DEBUG: EventSource created, readyState:', source.readyState,
+                    '(0=connecting, 1=open, 2=closed)');
+                console.log('STREAM DEBUG: Setting up EventSource handlers...');
 
-                    // Direct EventSource approach - more reliable than iframe
-                    const streamUrl = `${SERVER_URL}/browser-stream/${sessionId}?_t=${Date.now()}`;
-                    console.log('STREAM DEBUG: EventSource URL:', streamUrl);
-                    console.log('STREAM DEBUG: Server URL base:', SERVER_URL);
+                // Set connection timeout
+                connectionTimeoutId = setTimeout(() => {
+                    console.error('STREAM DEBUG: Timeout triggered - connection timed out after 10 seconds');
+                    console.error('STREAM DEBUG: EventSource readyState at timeout:', source.readyState);
 
-                    // Verbose debug information
-                    console.log('STREAM DEBUG: Browser info:', navigator.userAgent);
-                    console.log('STREAM DEBUG: Creating EventSource...');
+                    addStatusMessage('error', 'Stream connection timed out - will retry');
+                    if (source && source.readyState !== 2) { // Not closed
+                        console.log('STREAM DEBUG: Closing EventSource due to timeout');
+                        source.close();
+                    }
+
+                    // Auto-retry after short delay with increasing backoff
+                    if (!window.streamRetryCount) {
+                        window.streamRetryCount = 0;
+                    }
+
+                    window.streamRetryCount++;
+                    const backoffDelay = Math.min(window.streamRetryCount * 1000, 5000);
+
+                    setTimeout(() => {
+                        if (sessionId && !streaming) {
+                            console.log(`STREAM DEBUG: Auto-retrying stream connection (attempt ${window.streamRetryCount})...`);
+                            startStream();
+                        }
+                    }, backoffDelay);
+                }, 10000);
+
+                // Handle connection open
+                source.onopen = () => {
+                    console.log('STREAM DEBUG: EventSource.onopen fired! Connection succeeded.');
+                    console.log('STREAM DEBUG: EventSource readyState in onopen:', source.readyState);
+
+                    clearTimeout(connectionTimeoutId);
+                    connectionTimeoutId = null;
+
+                    // Reset retry count on successful connection
+                    window.streamRetryCount = 0;
+
+                    setStreamStatus('active');
+                    setStreaming(true);
+                    addStatusMessage('success', 'Stream connected successfully');
+                };
+
+                // Handle messages
+                source.onmessage = (event) => {
+                    console.log('STREAM DEBUG: Received message event:', event.type, 'Data length:', event.data?.length || 0);
+
+                    // Process image data
+                    if (event.data && event.data.startsWith('data:image')) {
+                        console.log('STREAM DEBUG: Image received, length:', event.data.length);
+                        setBrowserImage(event.data);
+                    } else {
+                        console.log('STREAM DEBUG: Received non-image data:', event.data);
+                    }
+                };
+
+                // Handle specific events
+                source.addEventListener('status', (event) => {
+                    console.log('STREAM DEBUG: Received status event:', event.type, 'Data:', event.data);
 
                     try {
-                        const source = new EventSource(streamUrl);
-                        console.log('STREAM DEBUG: EventSource created, readyState:', source.readyState,
-                            '(0=connecting, 1=open, 2=closed)');
-                        console.log('STREAM DEBUG: Setting up EventSource handlers...');
-
-                        // Set connection timeout
-                        connectionTimeoutId = setTimeout(() => {
-                            console.error('STREAM DEBUG: Timeout triggered - connection timed out after 10 seconds');
-                            console.error('STREAM DEBUG: EventSource readyState at timeout:', source.readyState);
-
-                            addStatusMessage('error', 'Stream connection timed out - will retry');
-                            if (source && source.readyState !== 2) { // Not closed
-                                console.log('STREAM DEBUG: Closing EventSource due to timeout');
-                                source.close();
-                            }
-
-                            // Auto-retry after short delay with increasing backoff
-                            if (!window.streamRetryCount) {
-                                window.streamRetryCount = 0;
-                            }
-
-                            window.streamRetryCount++;
-                            const backoffDelay = Math.min(window.streamRetryCount * 1000, 5000);
-
-                            setTimeout(() => {
-                                if (sessionId && !streaming) {
-                                    console.log(`STREAM DEBUG: Auto-retrying stream connection (attempt ${window.streamRetryCount})...`);
-                                    startStream();
-                                }
-                            }, backoffDelay);
-                        }, 10000);
-
-                        // Handle connection open
-                        source.onopen = () => {
-                            console.log('STREAM DEBUG: EventSource.onopen fired! Connection succeeded.');
-                            console.log('STREAM DEBUG: EventSource readyState in onopen:', source.readyState);
-
-                            clearTimeout(connectionTimeoutId);
-                            connectionTimeoutId = null;
-
-                            // Reset retry count on successful connection
-                            window.streamRetryCount = 0;
-
-                            setStreamStatus('active');
-                            setStreaming(true);
-                            addStatusMessage('success', 'Stream connected successfully');
-                        };
-
-                        // Handle messages
-                        source.onmessage = (event) => {
-                            console.log('STREAM DEBUG: Received message event:', event.type, 'Data length:', event.data?.length || 0);
-
-                            // Process image data
-                            if (event.data && event.data.startsWith('data:image')) {
-                                console.log('STREAM DEBUG: Image received, length:', event.data.length);
-                                setBrowserImage(event.data);
-                            } else {
-                                console.log('STREAM DEBUG: Received non-image data:', event.data);
-                            }
-                        };
-
-                        // Handle specific events
-                        source.addEventListener('status', (event) => {
-                            console.log('STREAM DEBUG: Received status event:', event.type, 'Data:', event.data);
-
-                            try {
-                                const data = JSON.parse(event.data);
-                                console.log('STREAM DEBUG: Status update from stream:', data);
-                                addStatusMessage(data.type || 'info', data.message || 'Stream update');
-                            } catch (e) {
-                                console.error('STREAM DEBUG: Error parsing status event:', e);
-                            }
-                        });
-
-                        // Handle errors
-                        source.onerror = (error) => {
-                            console.error('STREAM DEBUG: EventSource error:', error);
-                            console.error('STREAM DEBUG: EventSource readyState in onerror:', source.readyState);
-
-                            if (source.readyState === 2) { // CLOSED
-                                console.error('STREAM DEBUG: EventSource connection CLOSED');
-                                addStatusMessage('error', 'Stream connection closed by server');
-                                if (connectionTimeoutId) {
-                                    clearTimeout(connectionTimeoutId);
-                                    connectionTimeoutId = null;
-                                }
-                                setStreaming(false);
-                                setStreamStatus('error');
-                                // Try fallback polling
-                                tryPollingFallback();
-                            } else {
-                                console.warn('STREAM DEBUG: EventSource error but connection still open');
-                                addStatusMessage('warning', 'Stream connection error - will try to continue');
-                            }
-                        };
-
-                        // Store reference for cleanup
-                        streamSourceRef.current = source;
-                        console.log('STREAM DEBUG: EventSource setup complete');
-                    } catch (err) {
-                        console.error('STREAM DEBUG: Error creating EventSource:', err);
-                        addStatusMessage('error', `Stream connection error: ${err.message}`);
-                        setStreamStatus('error');
-
-                        // Clear timeout
-                        if (connectionTimeoutId) {
-                            clearTimeout(connectionTimeoutId);
-                            connectionTimeoutId = null;
-                        }
-
-                        // Fall back to polling
-                        tryPollingFallback();
-                    }
-                })
-                .catch(err => {
-                    console.error('STREAM DEBUG: Session verification failed:', err);
-
-                    // Handle rate limiting
-                    if (err.response && err.response.status === 429) {
-                        addStatusMessage('warning', 'Rate limited when connecting. Waiting before retry...');
-
-                        // Add increasing backoff for retry
-                        if (!window.streamRetryCount) {
-                            window.streamRetryCount = 0;
-                        }
-
-                        window.streamRetryCount++;
-                        const backoffDelay = Math.min(Math.pow(2, window.streamRetryCount) * 1000, 15000);
-
-                        setTimeout(() => {
-                            if (sessionId) {
-                                console.log(`STREAM DEBUG: Retrying after rate limit (429) with ${backoffDelay}ms delay`);
-                                startStream();
-                            }
-                        }, backoffDelay);
-                    } else {
-                        addStatusMessage('error', `Cannot start stream - session verification failed: ${err.message}`);
-
-                        if (connectionTimeoutId) {
-                            clearTimeout(connectionTimeoutId);
-                        }
-
-                        setStreamStatus('error');
-                        // Try to create a new session only if we get a 404 (session not found)
-                        if (err.response && err.response.status === 404) {
-                            console.log('STREAM DEBUG: Session not found, will try to create a new one');
-                            handleSessionExpired();
-                        }
+                        const data = JSON.parse(event.data);
+                        console.log('STREAM DEBUG: Status update from stream:', data);
+                        addStatusMessage(data.type || 'info', data.message || 'Stream update');
+                    } catch (e) {
+                        console.error('STREAM DEBUG: Error parsing status event:', e);
                     }
                 });
+
+                // Handle errors
+                source.onerror = (error) => {
+                    console.error('STREAM DEBUG: EventSource error:', error);
+                    console.error('STREAM DEBUG: EventSource readyState in onerror:', source.readyState);
+
+                    if (source.readyState === 2) { // CLOSED
+                        console.error('STREAM DEBUG: EventSource connection CLOSED');
+                        addStatusMessage('error', 'Stream connection closed by server');
+                        if (connectionTimeoutId) {
+                            clearTimeout(connectionTimeoutId);
+                            connectionTimeoutId = null;
+                        }
+                        setStreaming(false);
+                        setStreamStatus('error');
+                        // Try fallback polling
+                        tryPollingFallback();
+                    } else {
+                        console.warn('STREAM DEBUG: EventSource error but connection still open');
+                        addStatusMessage('warning', 'Stream connection error - will try to continue');
+                    }
+                };
+
+                // Store reference for cleanup
+                streamSourceRef.current = source;
+                console.log('STREAM DEBUG: EventSource setup complete');
+            } catch (err) {
+                console.error('STREAM DEBUG: Error creating EventSource:', err);
+                addStatusMessage('error', `Stream connection error: ${err.message}`);
+                setStreamStatus('error');
+
+                // Clear timeout
+                if (connectionTimeoutId) {
+                    clearTimeout(connectionTimeoutId);
+                    connectionTimeoutId = null;
+                }
+
+                // Fall back to polling
+                tryPollingFallback();
+            }
         } catch (err) {
             console.error('STREAM DEBUG: Fatal error creating stream connection:', err);
             addStatusMessage('error', `Stream connection error: ${err.message}`);
@@ -1805,7 +1744,7 @@ function App() {
             // Fall back to polling
             tryPollingFallback();
         }
-    }, [sessionId, streaming, streamStatus, addStatusMessage, cleanupStream, handleSessionExpired]);
+    }, [sessionId, streaming, streamStatus, addStatusMessage, cleanupStream]);
 
     /**
      * Fall back to polling
@@ -1895,7 +1834,7 @@ function App() {
 
             console.log(`Starting ping #${requestId}`);
             const response = await axios.get(
-                `${SERVER_URL}/health?_t=${requestId}`,
+                `${SERVER_URL}/api/health?_t=${requestId}`,
                 {
                     timeout: 5000,
                     signal: controller.signal
@@ -2157,7 +2096,7 @@ function App() {
 
             try {
                 const response = await axios.get(
-                    `${SERVER_URL}/health?_t=${requestId}`,
+                    `${SERVER_URL}/api/health?_t=${requestId}`,
                     {
                         timeout: 8000, // Increased timeout
                         signal: healthCheckControllerRef.current.signal,

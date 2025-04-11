@@ -5,3 +5,6 @@
 *firebase-debug.log
 *firestore-debug.log
 *ui-debug.log
+*server/node_modules/
+*server/dist/
+*ui/node_modules/

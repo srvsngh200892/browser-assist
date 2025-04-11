@@ -14,6 +14,7 @@ app.get("/sse", async (_: Request, res: Response) => {
     transports[transport.sessionId] = transport;
     console.log("Transport created for sessionId:", transport.sessionId);
     res.on("close", () => {
+        console.log("Transport closed for sessionId:", transport.sessionId);
         delete transports[transport.sessionId];
     });
     await server.connect(transport);
@@ -27,6 +28,32 @@ app.post("/messages", async (req: Request, res: Response) => {
         await transport.handlePostMessage(req, res);
     } else {
         res.status(400).send("No transport found for sessionId");
+    }
+});
+
+app.get('/health', async (_req, res) => {
+    try {
+        // Add any critical checks here
+        // For example, verify browser connections, check memory usage, etc.
+        const isHealthy = true; // Add your health check logic here
+
+        if (isHealthy) {
+            res.status(200).json({
+                status: 'healthy',
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(503).json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString()
+            });
+        }
+    } catch (error: any) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
     }
 });
 

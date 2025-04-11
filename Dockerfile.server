@@ -1,17 +1,22 @@
-FROM denoland/deno:2.2.2
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY deno.json deno.lock ./
-COPY server/ ./server/
+# Copy package files first for better caching
+COPY server/package*.json ./
 
-# Cache Deno dependencies
-RUN deno cache --lock=deno.lock server/server.ts
+# Install dependencies
+RUN npm install
+
+# Copy project files
+COPY server ./
+
+# Build TypeScript code
+RUN npm run build
 
 # Expose application port
 EXPOSE 3001
 
-# Default command to run your Deno application
-CMD ["deno", "run", "--allow-all", "server/server.ts"]
+# Default command to run the Node.js application
+CMD ["npm", "start"]

@@ -164,7 +164,7 @@ function Login({ onLoginSuccess }) {
         setLoading(true);
 
         try {
-            const endpoint = isLogin ? '/auth/login' : '/auth/register';
+            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
             const payload = isLogin
                 ? { email: formData.email, password: formData.password }
                 : { username: formData.username, email: formData.email, password: formData.password };
