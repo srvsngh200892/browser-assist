@@ -12,6 +12,7 @@ services:
       - "4000:4000"  # Firebase emulator UI
       - "8080:8080"  # Firestore
       - "9099:9099"  # Auth
+      - "9199:9199"  # Storage
     volumes:
       - ./firebase-data:/app/firebase-data  # For data persistence
     networks:
@@ -36,7 +37,7 @@ services:
       - ./server/src/.env
     environment:
       # This ensures the container uses the correct hostname for the Firebase emulator
-      - FIREBASE_EMULATOR_HOST=firebase
+      - FIREBASE_EMULATOR_HOST=browser-assist-firebase
       # Connect to Playwright SSE server - Using container name instead of localhost
       - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/sse
     volumes:

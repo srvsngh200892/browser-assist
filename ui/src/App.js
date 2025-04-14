@@ -3,6 +3,7 @@ import axios from 'axios';
 import './App.css';
 import SessionInfo from './SessionInfo'; // Import the SessionInfo component
 import Login from './Login'; // Import the Login component
+import ValidationReport from './ValidationReport'; // Import the ValidationReport component
 
 // Set up axios interceptor to add auth token to all requests
 axios.interceptors.request.use(
@@ -91,6 +92,10 @@ function App() {
     const [streaming, setStreaming] = useState(false);
     const [streamStatus, setStreamStatus] = useState('waiting');
 
+    // Add state to track screenshot availability for validation report
+    const [hasScreenshots, setHasScreenshots] = useState(false);
+    const [screenshotCount, setScreenshotCount] = useState(0);
+
     // Status messages
     const [statusMessages, setStatusMessages] = useState([{
         type: 'info',
@@ -154,6 +159,49 @@ function App() {
     useEffect(() => {
         sessionIdRef.current = sessionId;
     }, [sessionId]);
+
+    /**
+     * Check if session has screenshots available for validation report
+     */
+    const checkScreenshotAvailability = useCallback(async () => {
+        if (!sessionId) return;
+
+        try {
+            const response = await axios.get(`${SERVER_URL}/api/validation/status/${sessionId}`);
+
+            if (response.data.success) {
+                const hasScreens = response.data.hasScreenshots || false;
+                const count = response.data.screenshotCount || 0;
+
+                setHasScreenshots(hasScreens);
+                setScreenshotCount(count);
+
+                if (hasScreens) {
+                    console.log(`Session has ${count} screenshots available for validation report`);
+                }
+            }
+        } catch (err) {
+            console.error('Error checking screenshot availability:', err);
+            // Don't show error to user, just keep hasScreenshots false
+            setHasScreenshots(false);
+            setScreenshotCount(0);
+        }
+    }, [sessionId]);
+
+    // Check for screenshot availability when session ID changes or after some time interval
+    useEffect(() => {
+        if (sessionId) {
+            // Check initially when session ID is set
+            checkScreenshotAvailability();
+
+            // Set up interval to periodically check for screenshots
+            const screenshotCheckInterval = setInterval(() => {
+                checkScreenshotAvailability();
+            }, 30000); // Check every 30 seconds
+
+            return () => clearInterval(screenshotCheckInterval);
+        }
+    }, [loading, checkScreenshotAvailability]);
 
     /**
      * Add a status message
@@ -933,9 +981,6 @@ function App() {
 
                     // Don't stop stream completely, just pause it (switch to "waiting" state)
                     if (streaming) {
-                        console.log('POLL: Pausing stream since response is complete');
-                        setStreamStatus('waiting');
-
                         // Let server know to pause sending updates (with error handling)
                         try {
                             axios.post(`${SERVER_URL}/api/stream-control`, {
@@ -943,6 +988,8 @@ function App() {
                                 action: 'pause',
                                 reason: 'response_complete'
                             }).catch(err => console.log('Server may not support stream pausing yet'));
+                            console.log('POLL: Pausing stream since response is complete');
+                            setStreamStatus('waiting');
                         } catch (err) {
                             console.error('Error in stream pause notification:', err);
                         }
@@ -999,35 +1046,6 @@ function App() {
                 // If the last message is from the assistant and has a finish_reason of "stop", 
                 // we consider the response complete
                 return lastMessage?.role === 'assistant' && lastMessage?.finish_reason === 'stop';
-            } else {
-                // If the last message is from the user, check if there's a completed assistant response
-                // after the last user message in the conversation
-                let lastUserIndex = -1;
-                let hasAssistantAfterUser = false;
-                let assistantComplete = false;
-
-                // Find the last user message
-                for (let i = currentMessages.length - 1; i >= 0; i--) {
-                    if (currentMessages[i].role === 'user') {
-                        lastUserIndex = i;
-                        break;
-                    }
-                }
-
-                // Check if there's a completed assistant response after the last user message
-                if (lastUserIndex !== -1) {
-                    for (let i = lastUserIndex + 1; i < currentMessages.length; i++) {
-                        if (currentMessages[i].role === 'assistant' && !currentMessages[i].is_typing) {
-                            hasAssistantAfterUser = true;
-                            if (currentMessages[i].finish_reason === 'stop') {
-                                assistantComplete = true;
-                            }
-                        }
-                    }
-                }
-
-                // Return true if we have a completed assistant response after the last user message
-                return hasAssistantAfterUser && assistantComplete;
             }
         })();
 
@@ -1051,7 +1069,7 @@ function App() {
             // First check if server has explicitly said we're done via the isDone flag or localStorage
             !serverMarkedComplete && response?.data?.isDone !== true &&
             // Then check if we need to continue polling based on the conversation state
-            (loadingRef.current || (lastIsUser && !hasCompletedResponse));
+            (loadingRef.current || (!hasCompletedResponse));
 
         if (shouldContinuePolling && sessionId) {
             console.log(`POLL: Scheduling next poll in ${LOCAL_POLL_INTERVAL}ms (loading: ${loadingRef.current}, lastIsUser: ${lastIsUser}, hasCompletedResponse: ${hasCompletedResponse}, serverMarkedComplete: ${serverMarkedComplete}, isDone: ${response?.data?.isDone})`);
@@ -1367,19 +1385,15 @@ function App() {
         if (sessionId && streaming && streamStatus === 'waiting') {
             console.log('STREAM DEBUG: Resuming stream for new activity');
 
-            // Change status back to active
-            setStreamStatus('active');
-
-            // Clear completion flag
-            const responseCompleteKey = `response-complete-${sessionId}`;
-            localStorage.removeItem(responseCompleteKey);
-
             // Notify server to resume sending data
             try {
                 axios.post(`${SERVER_URL}/api/stream-control`, {
                     sessionId: sessionId,
                     action: 'resume'
                 }).catch(err => console.log('Server may not support stream resuming yet'));
+                setStreamStatus('active');
+                const responseCompleteKey = `response-complete-${sessionId}`;
+                localStorage.removeItem(responseCompleteKey);
             } catch (err) {
                 console.error('Error in stream resume notification:', err);
             }
@@ -2372,6 +2386,16 @@ function App() {
                                     >
                                         {showTechnicalMessages ? 'Hide Technical Details' : 'Show Technical Details'}
                                     </button>
+
+                                    {/* Add ValidationReport only when screenshots are available */}
+                                    {!loading && hasScreenshots && sessionId && (
+                                        <ValidationReport
+                                            sessionId={sessionId}
+                                            onError={(msg) => addStatusMessage('error', msg)}
+                                            hasScreenshots={hasScreenshots}
+                                            screenshotCount={screenshotCount}
+                                        />
+                                    )}
                                 </div>
                             </div>
 

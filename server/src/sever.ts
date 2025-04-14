@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
-import { openaiClient } from './utils/openai-client';
 
 // Import environment configuration
 import {
     PORT,
-    HOST
+    HOST,
+    OPENAI_API_KEY
 } from './config/env';
 
 // Import message handler
@@ -61,9 +61,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Configure JSON body parser with larger limits for screenshot uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json());
 
 // Rate limiting middleware (basic implementation)
 app.use(async (req, res, next) => {
@@ -78,6 +76,12 @@ app.use(async (req, res, next) => {
 
     // Proceed to next middleware
     next();
+});
+
+// Initialize OpenAI with a fallback key for testing if needed
+const openai = new OpenAI({
+    apiKey: OPENAI_API_KEY || "sk-dummy-key-for-testing-purposes-only",
+    baseURL: `https://llm-dev.medable.tech`
 });
 
 // This will be initialized in the init endpoint
@@ -126,14 +130,13 @@ import messageRoutes from './routes/message-routes';
 // @ts-ignore - Force TypeScript to ignore missing module declaration
 import streamRoutes from './routes/stream-routes';
 import authRoutes from './routes/auth-routes';
-import validationRoutes from './routes/validation-routes';
 
 // Apply routes
 app.use('/api', sessionRoutes);
 app.use('/api', messageRoutes);
 app.use('/api', streamRoutes);
 app.use('/api', authRoutes);
-app.use('/api', validationRoutes);
+
 
 // Add a health check endpoint
 app.get("/api/health", (_req, res) => {
@@ -153,7 +156,7 @@ app.get("/api/ping", (_req, res) => {
 });
 
 // Export for external use (e.g., in tests)
-export { app, openaiClient, openAiTools, getOrCreateMessageHandler };
+export { app, openai, openAiTools, getOrCreateMessageHandler };
 
 // Start the server if this file is run directly
 if (require.main === module) {

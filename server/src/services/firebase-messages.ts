@@ -358,4 +358,4 @@ export async function getLastAssistantMessage(sessionId: string): Promise<Messag
     }
 }
 
-export { db }; 
+export { db, app };

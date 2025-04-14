@@ -2,7 +2,8 @@
 
 import { MessageType } from '../services/messages';
 import {
-    SUMMARY_SYSTEM_PROMPT
+    SUMMARY_SYSTEM_PROMPT,
+    initialMessageSystemPrompt
 } from "../utils/prompts";
 
 // Token limits
@@ -43,7 +44,7 @@ export async function summarizeConversation(messages: MessageType[], openai: any
             messages: [
                 { role: "system", content: SUMMARY_SYSTEM_PROMPT },
                 {
-                    role: "user", content: "Please provide a detailed summary of this conversation, focusing on important context, instructions given, and actions taken. Include any crucial information that would be needed to continue the conversation effectively. The summary should be comprehensive but concise.\n\n" +
+                    role: "user", content: "Please provide a detailed summary of this conversation, focusing on important context, instructions given, and actions taken. Include any crucial information that would be needed to continue the conversation effectively. The summary should be comprehensive but concise, Keep points about what was done and what was not done. If there are any tool calls, please include them in your memory.\n\n" +
                         messages.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n\n")
                 }
             ],
@@ -62,30 +63,36 @@ export async function summarizeConversation(messages: MessageType[], openai: any
 // Create summarized messages
 export function createSummarizedMessages(
     originalMessages: MessageType[],
-    summary: string
+    summary: string,
+    isConversationComplete: boolean
 ): MessageType[] {
     console.log(`Creating summarized messages from ${originalMessages.length} messages`);
 
-    // Get the first few system messages to preserve context
-    const systemMessages = originalMessages
-        .filter(m => (m as any).role === 'system')
-        .slice(0, 2);
+    // // Get the first few system messages to preserve context
+    // const systemMessages = originalMessages
+    //     .filter(m => (m as any).role === 'system')
+    //     .slice(0, 2);
 
-    // Create a new summary message - use type assertion
+    // Create a new summary message with both initial prompt and summary
     const summaryMessage = {
         role: 'system',
-        content: `Previous conversation summary: ${summary}`,
+        content: `${initialMessageSystemPrompt}\n\n Previous conversation summary: Here is the past summary between you and the user: ${summary}. Clearly understand the past summary and use it to start the conversation base on user needs.`,
         id: `summary-${Date.now()}`
     } as unknown as MessageType;
 
     // Get the last few messages for continuity
-    const recentMessages = originalMessages
-        .filter(m => (m as any).role !== 'system')
-        .slice(-5);
+    let recentMessages: MessageType[] = []
+    if (!isConversationComplete) {
+        recentMessages = originalMessages
+            .filter(m => {
+                return ['user'].includes(m.role)
+            })
+            .slice(-1);
+    }
 
+    console.log("SummaryMessage messages:", summaryMessage);
     // Combine them
     return [
-        ...systemMessages,
         summaryMessage,
         ...recentMessages
     ];

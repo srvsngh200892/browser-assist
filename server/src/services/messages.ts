@@ -18,6 +18,7 @@ export type MessageType = OpenAI.Chat.Completions.ChatCompletionMessageParam | O
     content: string | null;
     id?: string;
     tool_calls?: Array<any>;
+    finish_reason?: string;
 };
 
 class MessageHandler {

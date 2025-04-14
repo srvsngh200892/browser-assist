@@ -5,13 +5,12 @@ import { MessageHandler } from '../services/messages';
 import { mcpClient } from '../utils/client.js';
 import sessionStore from '../services/session-store';
 import {
-    StreamState,
     getStreamState,
     setStreamState,
     clearStreamState
 } from '../services/firebase-sessions';
-import { ReadableStream } from 'stream/web';
 import { Router } from 'express';
+import { storeScreenshot } from '../services/firebase-storage';
 
 // Extend the Express Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -197,6 +196,9 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     // Flag to track if the connection is active
     let isStreamConnected = true;
 
+    // Flag to prevent overlapping screenshot calls
+    let isProcessingScreenshot = false;
+
     // Function to safely send data
     const safeSend = (data: string, operation = "unknown") => {
         if (!isStreamConnected) {
@@ -233,6 +235,9 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     const sendScreenshot = async () => {
         if (!isStreamConnected) return;
 
+        const startTime = Date.now();
+        console.log(`Starting screenshot capture for session ${sessionId}`);
+
         try {
             // Check if the stream is paused
             const streamState = await getStreamState(sessionId) || {
@@ -241,21 +246,34 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                 pauseReason: '',
                 pausedAt: 0,
                 resumedAt: 0,
-                lastScreenshotAt: 0
+                lastScreenshotAt: 0,
+                lastPerceptualHash: '',
+                similarityThreshold: 70, // Default 70% similarity threshold
+                minScreenshotInterval: 2000, // Default 2 seconds between screenshots
+                blankImageThreshold: 0.90 // Default threshold for blank image detection
             };
 
-            // If the stream is paused, send a status message
+            const stateCheckTime = Date.now();
+            console.log(`Stream state fetch took ${stateCheckTime - startTime}ms for session ${sessionId}`);
+            console.log(`Stream is paused for session ${streamState.active}, sending pause notification`);
+
+            // If the stream is paused, send a status message and return
             if (!streamState.active) {
+                console.log(`Stream is paused for session ${sessionId}, sending pause notification`);
                 const pauseMessage = `event: status\ndata: {"type":"paused","message":"Stream paused","reason":"${streamState.pauseReason || 'client_request'}"}\n\n`;
                 safeSend(pauseMessage, "pause notification");
                 return;
             }
 
             // Call MCP for screenshot
+            console.log(`Calling MCP for screenshot at ${Date.now() - startTime}ms`);
             const result = await mcpClient.callTool({
                 name: "browser_take_screenshot",
                 arguments: {}
             });
+
+            const screenshotTime = Date.now();
+            console.log(`MCP screenshot capture took ${screenshotTime - stateCheckTime}ms for session ${sessionId}`);
 
             // Find image data
             if (!result || !result.content || !Array.isArray(result.content)) {
@@ -267,21 +285,55 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             );
 
             if (imageContent && imageContent.data) {
-                // Send the screenshot
-                const message = `data: data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}\n\n`;
-                safeSend(message, "screenshot");
+                console.log(`Starting duplicate check at ${Date.now() - startTime}ms`);
+                // First, check if this is a new screenshot worth storing
+                const screenshotResult = await storeScreenshot(
+                    sessionId,
+                    `data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}`,
+                    streamState.lastPerceptualHash,
+                    streamState.similarityThreshold, // Pass the similarity threshold
+                    streamState.blankImageThreshold // Pass the blank image threshold
+                );
 
-                // Update the last screenshot timestamp in Firebase
-                setStreamState(sessionId, {
-                    lastScreenshotAt: Date.now()
-                }).catch(error => {
-                    console.error(`Failed to update screenshot timestamp: ${error instanceof Error ? error.message : "Unknown error"}`);
-                });
+                const processTime = Date.now();
+                console.log(`Screenshot processing took ${processTime - screenshotTime}ms for session ${sessionId}`);
 
-                errorCount = 0;
+                // Only send to the client if it's a new screenshot (not a duplicate)
+                console.log(`Screenshot result: ${JSON.stringify(screenshotResult)}`);
+                if (screenshotResult) {
+                    const similarityInfo = screenshotResult.similarity
+                        ? `, similarity: ${screenshotResult.similarity.toFixed(2)}%`
+                        : '';
+                    console.log(`New screenshot detected for session ${sessionId}, hash: ${screenshotResult.hash.substring(0, 8)}...${similarityInfo}`);
+
+                    // Send the screenshot data to the client only after confirming it's not a duplicate
+                    const message = `data: data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}\n\n`;
+                    safeSend(message, "screenshot");
+                    console.log(`Screenshot sent to client at ${Date.now() - startTime}ms for session ${sessionId}`);
+
+                    // Update the last screenshot timestamp AND hash in Firebase
+                    setStreamState(sessionId, {
+                        lastScreenshotAt: Date.now(),
+                        lastPerceptualHash: screenshotResult.hash
+                    }).catch(error => {
+                        console.error(`Failed to update screenshot timestamp: ${error instanceof Error ? error.message : "Unknown error"}`);
+                    });
+
+                    // Only reset error count if we successfully processed a new screenshot
+                    errorCount = 0;
+                } else {
+                    console.log(`Duplicate screenshot detected for session ${sessionId}, skipping send after ${Date.now() - startTime}ms total processing time`);
+
+                    // Send a status update to inform the client we're still active but no new image
+                    const statusMsg = `event: status\ndata: {"type":"no_update","message":"No significant changes detected"}\n\n`;
+                    safeSend(statusMsg, "no update notification");
+                }
             } else {
                 throw new Error("No image data found in response");
             }
+
+            const endTime = Date.now();
+            console.log(`Total screenshot process took ${endTime - startTime}ms for session ${sessionId}`);
         } catch (error) {
             errorCount++;
             console.error(`Screenshot error (${errorCount}): ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -308,6 +360,37 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
         console.error(`Error in initial screenshot: ${err instanceof Error ? err.message : "Unknown error"}`);
     });
 
+    // Set up a heartbeat to periodically check and sync stream state
+    const heartbeatInterval = setInterval(async () => {
+        if (!isStreamConnected) {
+            clearInterval(heartbeatInterval);
+            return;
+        }
+
+        try {
+            // Get current state from Firebase
+            const currentState = await getStreamState(sessionId);
+            if (!currentState) return;
+
+            // Send heartbeat with current state
+            const heartbeatMsg = `event: heartbeat\ndata: {"timestamp":${Date.now()},"state":"${currentState.active ? 'active' : 'paused'}"}\n\n`;
+            safeSend(heartbeatMsg, "heartbeat");
+
+            // Send appropriate status based on state
+            if (!currentState.active) {
+                // If paused, make sure client knows
+                const pauseMessage = `event: status\ndata: {"type":"paused","message":"Stream paused","reason":"${currentState.pauseReason || 'client_request'}"}\n\n`;
+                safeSend(pauseMessage, "pause reminder");
+            } else {
+                // If active, send a keepalive to ensure client doesn't time out waiting for images
+                const keepAliveMsg = `event: status\ndata: {"type":"keepalive","message":"Stream active, waiting for significant changes"}\n\n`;
+                safeSend(keepAliveMsg, "keepalive");
+            }
+        } catch (error) {
+            console.error(`Heartbeat error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+    }, 10000); // Check every 10 seconds
+
     // Handle client disconnection
     req.on("close", async () => {
         isStreamConnected = false;
@@ -316,14 +399,23 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             clearInterval(screenshotInterval);
         }
 
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+        }
+
         console.log(`Browser stream closed for session ${sessionId}`);
 
-        // Clear the stream state in Firebase
+        // Set stream as inactive but don't clear the state
+        // This way screenshots are preserved for later viewing
         try {
-            await clearStreamState(sessionId);
-            console.log(`Cleared stream state for session ${sessionId}`);
+            await setStreamState(sessionId, {
+                active: false,
+                pauseReason: 'stream_disconnected',
+                pausedAt: Date.now()
+            });
+            console.log(`Set stream state to inactive for session ${sessionId}`);
         } catch (e) {
-            console.error(`Failed to clear stream state: ${e instanceof Error ? e.message : "Unknown error"}`);
+            console.error(`Failed to update stream state: ${e instanceof Error ? e.message : "Unknown error"}`);
         }
     });
 
@@ -414,5 +506,4 @@ router.post("/stream-control", authMiddleware, async (req: AuthenticatedRequest,
     }
 });
 
-// Export router
 export default router; 
