@@ -29,9 +29,6 @@ import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 export // Function to process responses asynchronously
     async function processResponse(sessionId: string, messageHandler: MessageHandler) {
     try {
-        // Get or create an MCP client for this session
-
-
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
         let summarizationApplied = false;
@@ -58,7 +55,7 @@ export // Function to process responses asynchronously
                     const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                     // Create summarized messages with our utility function
-                    const summarizedMessages = createSummarizedMessages(messages, summary);
+                    const summarizedMessages = createSummarizedMessages(messages, summary, false);
 
                     // Update the message handler with the summarized messages
                     messageHandler.setMessages(summarizedMessages);
@@ -71,15 +68,6 @@ export // Function to process responses asynchronously
                     // Retrieve the updated messages
                     const updatedMessages = await messageHandler.getMessages();
                     console.log(`Messages after summarization: ${JSON.stringify(updatedMessages)}`);
-                }
-
-                // Log if summarization was applied
-                if (summarizationApplied) {
-                    await messageHandler.addMessage({
-                        role: "system",
-                        content: "Due to the length of this conversation, earlier messages have been summarized to stay within token limits. The assistant will continue based on this summary."
-                    });
-                    summarizationApplied = false; // Reset flag
                 }
 
                 console.log(`Messages: ${JSON.stringify(messages)}`);
@@ -108,10 +96,9 @@ export // Function to process responses asynchronously
 
                     if (isDone(response)) {
                         const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
-                        const summarizedMessages = createSummarizedMessages(messages, summary);
+                        const summarizedMessages = createSummarizedMessages(messages, summary, true);
                         messageHandler.setMessages(summarizedMessages);
                         console.log(`Agent loop is Done for session ${sessionId}`);
-
                         break;
                     }
 
@@ -132,16 +119,10 @@ export // Function to process responses asynchronously
                         const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
 
                         // Create summarized messages with our utility function
-                        const summarizedMessages = createSummarizedMessages(messages, summary);
+                        const summarizedMessages = createSummarizedMessages(messages, summary, false);
 
                         // Update the message handler with the summarized messages
                         messageHandler.setMessages(summarizedMessages);
-
-                        // Add a message to notify about the token limit
-                        await messageHandler.addMessage({
-                            role: "system",
-                            content: "The conversation reached the maximum token limit. Earlier messages have been summarized to continue. Some context may have been lost in this process."
-                        });
 
                         // Try again with summarized messages on the next iteration
                         continue;
@@ -152,11 +133,6 @@ export // Function to process responses asynchronously
                 }
 
             } catch (error: unknown) {
-                // Add a system message about the error
-                await messageHandler.addMessage({
-                    role: "system",
-                    content: `Error during processing request ${error instanceof Error ? error.message : "Unknown error"}`
-                } as MessageType);
                 throw error;
             }
         }
@@ -166,8 +142,10 @@ export // Function to process responses asynchronously
 
         // Add error to message handler
         await messageHandler.addMessage({
-            role: "system",
-            content: `Error processing message: ${error instanceof Error ? error.message : "Unknown error"}`
+            role: "assistant",
+            id: uuid(),
+            content: `Error processing message: ${error instanceof Error ? error.message : "Unknown error"}`,
+            finish_reason: "stop"
         });
 
     }

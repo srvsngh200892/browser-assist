@@ -1,0 +1,357 @@
+.validation-report {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Compact button style for chat header */
+.report-button {
+    background-color: #6B46C1;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(107, 70, 193, 0.3);
+    margin-left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    position: relative;
+    overflow: hidden;
+}
+
+.report-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+
+.report-button:hover {
+    background-color: #5835B0;
+    box-shadow: 0 6px 12px rgba(107, 70, 193, 0.5);
+    transform: translateY(-2px);
+}
+
+.report-button:hover::before {
+    transform: translateX(100%);
+}
+
+.report-button-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.report-button-text {
+    font-weight: 500;
+}
+
+/* Modal styles */
+.validation-report.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 1000;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    animation: slideUp 0.4s ease;
+    border: 1px solid rgba(107, 70, 193, 0.1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.close-modal-button {
+    background-color: transparent;
+    color: #718096;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s ease;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.close-modal-button:hover {
+    color: #4a5568;
+    background-color: rgba(226, 232, 240, 0.5);
+    transform: rotate(90deg);
+}
+
+.validation-report-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.validation-report-header h3 {
+    margin: 0 0 5px 0;
+    color: #6b46c1;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.validation-report-header p {
+    margin: 0;
+    color: #718096;
+    font-size: 14px;
+    text-align: center;
+}
+
+.validation-report-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 25px;
+}
+
+.action-icon-button {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #4a5568;
+    transition: all 0.2s ease;
+    width: 80px;
+    padding: 12px 0;
+    border-radius: 8px;
+}
+
+.action-icon-button:hover {
+    background-color: rgba(226, 232, 240, 0.5);
+    transform: translateY(-2px);
+}
+
+.action-icon-button:active {
+    transform: translateY(0);
+}
+
+.action-icon-button svg,
+.action-icon-button .icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.action-icon-button .label {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.action-icon-button.generate .icon {
+    color: #6b46c1;
+}
+
+.action-icon-button.download .icon {
+    color: #38a169;
+}
+
+.action-icon-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.validation-report-error {
+    color: #e53e3e;
+    margin: 15px 0;
+    padding: 12px;
+    background-color: #fff5f5;
+    border-radius: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-left: 4px solid #e53e3e;
+}
+
+.validation-report-error::before {
+    content: "⚠️";
+    font-size: 16px;
+}
+
+.validation-report-progress {
+    margin: 25px 0;
+}
+
+.download-ready-message {
+    margin: 25px 0 15px;
+    padding: 16px;
+    background-color: #d1f7c4;
+    border-radius: 10px;
+    color: #2f855a;
+    text-align: center;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    animation: fadeIn 0.5s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.download-ready-message::before {
+    content: "✅";
+    font-size: 20px;
+}
+
+.no-screenshots-message {
+    margin: 25px 0 15px;
+    padding: 16px;
+    background-color: #ebf4ff;
+    border-radius: 10px;
+    color: #3182ce;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    animation: fadeIn 0.5s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-left: 4px solid #4299e1;
+}
+
+.no-screenshots-message::before {
+    content: "ℹ️";
+    font-size: 20px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #6b46c1 0%, #805ad5 100%);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(107, 70, 193, 0.5);
+}
+
+.progress-status {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #4a5568;
+    text-align: center;
+    font-weight: 500;
+}
+
+.progress-time {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #718096;
+    text-align: center;
+}
+
+/* Animation for when report is generating */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.validation-report-progress .progress-bar {
+    animation: pulse 2s infinite;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        padding: 20px 16px;
+    }
+
+    .validation-report-buttons {
+        width: 100%;
+    }
+}

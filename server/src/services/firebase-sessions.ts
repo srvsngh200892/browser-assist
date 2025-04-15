@@ -36,6 +36,10 @@ export interface StreamState {
     pausedAt?: number;
     resumedAt?: number;
     lastScreenshotAt?: number; // Added to track last screenshot time
+    lastPerceptualHash?: string; // Perceptual hash of the last screenshot
+    similarityThreshold?: number; // Threshold percentage for image similarity (0-100)
+    minScreenshotInterval?: number; // Minimum time between screenshots in milliseconds
+    blankImageThreshold?: number; // Threshold for blank image detection (0-1), higher = more strict
 }
 
 // Create a new session in Firebase
