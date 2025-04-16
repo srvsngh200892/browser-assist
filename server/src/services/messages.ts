@@ -63,7 +63,6 @@ class MessageHandler {
 
     public async addMessage(message: MessageType) {
         this.messages.push(message);
-        console.log(message, this.debug);
         if (this.debug) {
             console.log(`Added message with role: ${message.role}`);
         }
@@ -106,13 +105,15 @@ class MessageHandler {
         return this.messages;
     }
 
-    public setMessages(messages: MessageType[]) {
+    public setMessages(messages: MessageType[], stopStore: boolean = true) {
         this.messages = messages;
         if (this.debug) {
             console.log(`Set messages array with ${messages.length} messages`);
         }
         // Store the updated messages in Firebase
-        this.storeMessages().catch(err => console.error("Failed to store updated messages:", err));
+        if (stopStore) {
+            this.storeMessages().catch(err => console.error("Failed to store updated messages:", err));
+        }
     }
 
     public updateLastRetrievalTime() {

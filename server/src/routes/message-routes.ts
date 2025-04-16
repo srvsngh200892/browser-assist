@@ -217,7 +217,6 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         });
 
         // Start async response processing
-        console.log(`Processing response for session ${sessionId}`, messageHandler.getMessages());
         processResponse(sessionId, messageHandler).catch(error => {
             console.error(`Error processing response: ${error instanceof Error ? error.message : "Unknown error"}`);
         });

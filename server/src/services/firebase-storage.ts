@@ -20,42 +20,27 @@ const getScreenshotPath = (sessionId: string, timestamp: number) => {
     return `validations/${sessionId}/screenshots/${timestamp}.png`;
 };
 
-// Helper function to detect if an image is blank or nearly blank
-async function isBlankImage(imageBuffer: Buffer, blankThreshold: number = 0.98): Promise<boolean> {
-    try {
-        // Get image stats
-        const { dominant } = await sharp(imageBuffer)
-            .stats();
 
-        // Get the average color of all channels (RGB)
-        const avgColorR = dominant.r / 255;
-        const avgColorG = dominant.g / 255;
-        const avgColorB = dominant.b / 255;
+async function isScreenshotBlankOrWithLoading(imageBuffer: Buffer, tolerancePercent = 0.5) {
+    const { data, info } = await sharp(imageBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-        // For white screens, all values will be close to 1
-        // For black screens, all values will be close to 0
-        const isWhite = avgColorR > blankThreshold && avgColorG > blankThreshold && avgColorB > blankThreshold;
-        const isBlack = avgColorR < (1 - blankThreshold) && avgColorG < (1 - blankThreshold) && avgColorB < (1 - blankThreshold);
+    const [r0, g0, b0, a0] = data.slice(0, 4); // First pixel
+    let diffCount = 0;
+    const totalPixels = info.width * info.height;
 
-        // Calculate color variance as a rough measurement of image content
-        const variance = Math.sqrt(
-            Math.pow(avgColorR - avgColorG, 2) +
-            Math.pow(avgColorG - avgColorB, 2) +
-            Math.pow(avgColorB - avgColorR, 2)
-        );
-
-        const isBlank = (isWhite || isBlack) && variance < 0.05;
-
-        if (isBlank) {
-            const colorType = isWhite ? "white" : "black";
-            console.log(`Detected blank ${colorType} image: R:${avgColorR.toFixed(2)}, G:${avgColorG.toFixed(2)}, B:${avgColorB.toFixed(2)}, Variance: ${variance.toFixed(4)}`);
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        if (r !== r0 || g !== g0 || b !== b0 || a !== a0) {
+            diffCount++;
         }
-
-        return isBlank;
-    } catch (error) {
-        console.error('Error analyzing image blankness:', error);
-        return false; // If we can't determine, assume it's not blank
     }
+
+    const diffPercent = (diffCount / totalPixels) * 100;
+
+    return diffPercent <= tolerancePercent;
 }
 
 // Helper to compress image before storage
@@ -158,8 +143,8 @@ export async function storeScreenshot(
     sessionId: string,
     base64Image: string,
     lastPerceptualHash?: string,
-    similarityThreshold: number = 75, // Increased default threshold for stricter matching
-    blankImageThreshold: number = 0.90 // Default threshold for blank image detection
+    similarityThreshold: number = 80, // Increased default threshold for stricter matching
+    blankImageThreshold: number = 0.50 // Default threshold for blank image detection
 ): Promise<{
     url: string;
     hash: string;
@@ -180,6 +165,13 @@ export async function storeScreenshot(
             compressResult = await compressScreenshot(base64Image);
         } catch (compressionError) {
             console.error('Error compressing screenshot:', compressionError);
+            return null;
+        }
+
+        // Check if image is blank or has loading
+        const isBlank = await isScreenshotBlankOrWithLoading(compressResult.imageBuffer, blankImageThreshold);
+        if (isBlank) {
+            console.log(`Detected blank image for session ${sessionId}, skipping`);
             return null;
         }
 
