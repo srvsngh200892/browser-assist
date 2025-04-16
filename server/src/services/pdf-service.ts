@@ -4,8 +4,6 @@ import { app } from './firebase-messages';
 import { getFirestore, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { getSessionMetadata } from './firebase-sessions';
 import { Readable } from 'stream';
-import https from 'https';
-import { USE_FIREBASE_EMULATOR } from './env';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -308,11 +306,10 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
         for (const message of userMessages) {
             doc.font(styles.normal.font)
                 .fontSize(styles.normal.fontSize)
-                .text('User:', { continued: false })
-                .moveDown(0.2)
-                .text(message.content || 'Empty message', {
-                    indent: 20  // Add left indentation for the message content
-                })
+                .font('Helvetica-Bold')
+                .text('User: ', { continued: true })
+                .font(styles.normal.font)
+                .text(message.content || 'Empty message')
                 .moveDown(0.5);
         }
 
@@ -320,11 +317,10 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
         if (lastAssistantMessage) {
             doc.font(styles.normal.font)
                 .fontSize(styles.normal.fontSize)
-                .text('Assistant:', { continued: false })
-                .moveDown(0.2)
-                .text(lastAssistantMessage.content || 'Empty message', {
-                    indent: 20  // Add left indentation for the message content
-                })
+                .font('Helvetica-Bold')
+                .text('Assistant: ', { continued: true })
+                .font(styles.normal.font)
+                .text(lastAssistantMessage.content || 'Empty message')
                 .moveDown(1);
         }
 

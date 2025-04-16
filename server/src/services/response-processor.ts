@@ -13,64 +13,37 @@ import {
 import {
     summarizeConversation,
     createSummarizedMessages,
-    MAX_TOKEN_LIMIT,
-    TOKEN_THRESHOLD,
-    estimateTokenCount
+    estimateTokenCount,
 } from '../utils/token-utils';
 
-import { performNextStepSystemPrompt } from '../utils/prompts';
+
+
+import { performNextStepSystemPrompt, initialMessageSystemPrompt } from '../utils/prompts';
 import { v4 as uuid } from 'uuid';
 import { MessageType } from './messages';
 
 // Import OpenAI configuration constants from environment
 import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 
-// Process response function 
+
+
 export // Function to process responses asynchronously
     async function processResponse(sessionId: string, messageHandler: MessageHandler) {
     try {
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
-        let summarizationApplied = false;
         const mcpToolsList = await mcpClient.listTools();
         console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
         // Extract the tools array from the response or use an empty array if not available
         const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
-
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             try {
                 console.log(`Starting agent loop iteration ${iteration + 1}/${maxIterations}`);
-                const messages = await messageHandler.getMessages();
-
-                // Check token count before making API call
+                let messages = await messageHandler.getMessages();
+                console.log(`Messages: ${JSON.stringify(messages, null, 2)}`);
                 const estimatedTokens = estimateTokenCount(messages);
-                console.log(`Estimated token count: ${estimatedTokens} / ${MAX_TOKEN_LIMIT} (${(estimatedTokens / MAX_TOKEN_LIMIT * 100).toFixed(2)}%)`);
-
-                // If approaching token limit, summarize conversation
-                if (estimatedTokens > MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
-                    console.log(`Token limit threshold reached (${estimatedTokens} tokens). Summarizing conversation...`);
-
-                    // Generate a summary of the conversation so far
-                    const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
-
-                    // Create summarized messages with our utility function
-                    const summarizedMessages = createSummarizedMessages(messages, summary, false);
-
-                    // Update the message handler with the summarized messages
-                    messageHandler.setMessages(summarizedMessages);
-                    summarizationApplied = true;
-
-                    // Log the summarization
-                    console.log("Applied summarization to reduce token count.");
-                    console.log(`New estimated token count: ${estimateTokenCount(summarizedMessages)}`);
-
-                    // Retrieve the updated messages
-                    const updatedMessages = await messageHandler.getMessages();
-                    console.log(`Messages after summarization: ${JSON.stringify(updatedMessages)}`);
-                }
-
-                console.log(`Messages: ${JSON.stringify(messages)}`);
+                console.log(`Estimated tokens: ${estimatedTokens}`);
 
                 try {
                     // Make the API call with current messages
@@ -95,20 +68,35 @@ export // Function to process responses asynchronously
                     await messageHandler.addMessage(assistantMessage);
 
                     if (isDone(response)) {
-                        const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
-                        const summarizedMessages = createSummarizedMessages(messages, summary, true);
-                        messageHandler.setMessages(summarizedMessages);
                         console.log(`Agent loop is Done for session ${sessionId}`);
                         break;
                     }
 
-                    const toolCallResponse = await applyToolCallsIfPresent(response, mcpClient);
+                    const toolCallResponse = await applyToolCallsIfPresent(response, mcpClient) || [];
 
                     if (toolCallResponse.length) {
                         await messageHandler.addMessages(toolCallResponse);
                     }
-
+                    let summarizedMessagesAssistant: MessageType[] = []
+                    if (iteration > 0) {
+                        const summarizedMessages = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT, 5);
+                        summarizedMessagesAssistant = [{
+                            role: 'assistant',
+                            content: summarizedMessages
+                        } as unknown as MessageType];
+                    }
+                    console.log(`Summarized Messages Assistant: ${JSON.stringify(summarizedMessagesAssistant, null, 2)}`);
+                    // Find the latest user message by iterating backwards through messages
+                    let latestUserMessage: MessageType = { role: 'user', content: '' };
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                        if (messages[i].role === 'user') {
+                            latestUserMessage = messages[i];
+                            break;
+                        }
+                    }
+                    await messageHandler.setMessages([messages[0], latestUserMessage, ...summarizedMessagesAssistant, assistantMessage, ...toolCallResponse], false);
                     await messageHandler.addMessage(performNextStepSystemPrompt);
+
                 } catch (apiError: unknown) {
                     // Check if the error is related to token limits
                     if (apiError instanceof Error && apiError.message && apiError.message.includes("maximum context length")) {
@@ -116,10 +104,10 @@ export // Function to process responses asynchronously
 
                         // Force summarization on token limit errors
                         const messages = await messageHandler.getMessages();
-                        const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT);
+                        const summary = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT, 5);
 
                         // Create summarized messages with our utility function
-                        const summarizedMessages = createSummarizedMessages(messages, summary, false);
+                        const summarizedMessages = createSummarizedMessages(messages, summary, 5);
 
                         // Update the message handler with the summarized messages
                         messageHandler.setMessages(summarizedMessages);

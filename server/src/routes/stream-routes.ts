@@ -248,9 +248,9 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                 resumedAt: 0,
                 lastScreenshotAt: 0,
                 lastPerceptualHash: '',
-                similarityThreshold: 70, // Default 70% similarity threshold
+                similarityThreshold: 80, // Default 80% similarity threshold
                 minScreenshotInterval: 2000, // Default 2 seconds between screenshots
-                blankImageThreshold: 0.90 // Default threshold for blank image detection
+                blankImageThreshold: 0.50 // Default threshold for blank image detection
             };
 
             const stateCheckTime = Date.now();
@@ -300,6 +300,8 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
 
                 // Only send to the client if it's a new screenshot (not a duplicate)
                 console.log(`Screenshot result: ${JSON.stringify(screenshotResult)}`);
+                const message = `data: data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}\n\n`;
+                safeSend(message, "screenshot");
                 if (screenshotResult) {
                     const similarityInfo = screenshotResult.similarity
                         ? `, similarity: ${screenshotResult.similarity.toFixed(2)}%`
@@ -307,8 +309,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                     console.log(`New screenshot detected for session ${sessionId}, hash: ${screenshotResult.hash.substring(0, 8)}...${similarityInfo}`);
 
                     // Send the screenshot data to the client only after confirming it's not a duplicate
-                    const message = `data: data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}\n\n`;
-                    safeSend(message, "screenshot");
                     console.log(`Screenshot sent to client at ${Date.now() - startTime}ms for session ${sessionId}`);
 
                     // Update the last screenshot timestamp AND hash in Firebase
