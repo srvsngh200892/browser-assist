@@ -94,6 +94,14 @@ export // Function to process responses asynchronously
                             break;
                         }
                     }
+                    // We're managing the conversation context by:
+                    // 1. Keeping the initial system prompt (messages[0])
+                    // 2. Preserving the latest user message to maintain context
+                    // 3. Adding summarized messages if we're beyond the first iteration
+                    // 4. Including the latest assistant message and any tool responses
+                    // 5. Adding the "perform next step" system prompt to guide the next iteration
+                    // This approach helps manage token usage while maintaining conversation coherence
+                    console.log(`Preparing to update message handler with optimized message set`);
                     await messageHandler.setMessages([messages[0], latestUserMessage, ...summarizedMessagesAssistant, assistantMessage, ...toolCallResponse], false);
                     await messageHandler.addMessage(performNextStepSystemPrompt);
 
