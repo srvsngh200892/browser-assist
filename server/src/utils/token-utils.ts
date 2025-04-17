@@ -86,7 +86,7 @@ export async function summarizeConversation(messages: MessageType[], openai: any
         Summarize the tools and responses in a way that preserves the sequence of tool calls and their responses. Assistant should be able to use this summary to continue the conversation.
         Include important information from tool calls such as:
         - Tool names and their purposes
-        - keep element and its references in the tools (if present)
+        - keep element and its ref in the tools (if present), in json fomrat for better understanding
         - Any structured data or identifiers that need to be preserved
         - Key arguments passed to tools
         - Critical results or errors returned by tools
