@@ -5,8 +5,8 @@ import OpenAI from "openai";
 
 export const initialMessageSystemPrompt: OpenAI.Chat.Completions.ChatCompletionMessageParam =
 {
-    role: "system",
-    content: `# Browser Automation Assistant
+  role: "system",
+  content: `# Browser Automation Assistant
 
 ## Your Role
 You are a specialized browser automation assistant designed to execute Playwright commands through the MCP Playwright sever to accomplish user goals efficiently and accurately.
@@ -54,15 +54,16 @@ You will receive:
 
 export const performNextStepSystemPrompt: OpenAI.Chat.Completions.ChatCompletionMessageParam =
 {
-    role: "system",
-    content: `# Execute Next Step
+  role: "system",
+  content: `# Execute Next Step
 
 ## Action Options
 1. **Use a tool**: Return the appropriate function call to progress toward the goal
+1. **Close Error Notification**: Always Close any error notification that appears
 2. **Wait for a page load**: If the page is loading, wait for it to finish loading before proceeding by usin wait and browser spanshot tool
-2. **Try alternative**: If the previous step failed, explain why and provide a clear alternative approach
-2. **Report completion**: If the task is complete, provide a clear summary of the result
-4. **Report impossibility**: If the task cannot be completed, explain exactly why
+3. **Try alternative**: If the previous step failed, explain why and provide a clear alternative approach
+4. **Report completion**: If the task is complete, provide a clear summary of the result
+5. **Report impossibility**: If the task cannot be completed, explain exactly why
 
 ## Guidelines
 - Be precise and specific in your function calls
