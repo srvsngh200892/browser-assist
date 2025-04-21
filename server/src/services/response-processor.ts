@@ -38,6 +38,11 @@ export // Function to process responses asynchronously
         const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
         for (let iteration = 0; iteration < maxIterations; iteration++) {
+            // Remove element at index 2 from message handler if it exists
+            const currentMessages = await messageHandler.getMessages();
+            if (iteration == 0 && currentMessages.length > 2 && currentMessages[2].role === 'assistant') {
+                await messageHandler.removeMessageAtIndex(2);
+            }
             try {
                 console.log(`Starting agent loop iteration ${iteration + 1}/${maxIterations}`);
                 let messages = await messageHandler.getMessages();

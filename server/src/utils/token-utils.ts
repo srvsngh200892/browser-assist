@@ -84,6 +84,7 @@ export async function summarizeConversation(messages: MessageType[], openai: any
                 content: `
         You're an assistant that helps maintain conversational memory across long-running sessions.
         Analyze both the user's goal and tool responses and assistant messages to track progress and maintain forward momentum.
+        Pay special attention to element references and their states to prevent stale reference errors.
         Provide your analysis in the following JSON structure:
         {
           "userGoal": "Brief description of user's primary goal",
@@ -92,26 +93,41 @@ export async function summarizeConversation(messages: MessageType[], openai: any
               "action": "What was last attempted",
               "status": "success|failed|pending",
               "error": "Error message if any",
-              "elementState": {} // Current state of relevant elements/refs
+              "elementState": {
+                "staleReferences": ["List of elements that became stale"],
+                "lastKnownValid": ["List of elements that were last known valid"],
+                "needsRefresh": boolean,
+                "pageState": "current|needsRefresh|unknown"
+              }
             },
-            "completedSteps": [] // list of steps with ids that have been completed
+            "completedSteps": []
           },
           "pendingSteps": [
             {
               "id": "unique_step_id",
               "action": "Description of the step",
               "prerequisite": "Any required previous step",
-              "requiredData": {},
-              "status": "blocked|ready"
+              "requiredData": {
+                "elements": ["Required element references"],
+                "validationRequired": boolean
+              },
+              "status": "blocked|ready|needsRefresh"
             }
           ],
           "errors": {
             "current": "Description of current error if any",
-            "resolution": "Steps needed to resolve"
+            "resolution": "Steps needed to resolve",
+            "referenceErrors": {
+              "type": "stale|missing|invalid",
+              "elements": ["Affected elements"],
+              "recommendedAction": "refresh|revalidate|retry"
+            }
           },
           "nextAction": {
             "step": "Immediate next action",
-            "context": "Required context for next action"
+            "context": "Required context for next action",
+            "requiresRefresh": boolean,
+            "fallbackStrategy": "Alternative approach if primary action fails"
           }
         }
 
@@ -121,7 +137,14 @@ export async function summarizeConversation(messages: MessageType[], openai: any
            - Which parts of the goal have been completed
            - What steps are currently in progress
            - What remains to be done
+           - Whether any element references have become stale
         3. Only focus on PENDING and FUTURE steps that align with the user's goal
+        
+        Reference Management Rules:
+        1. Track elements that become stale or invalid
+        2. Recommend page refresh when multiple references are stale
+        3. Include fallback strategies for handling reference errors
+        4. Monitor the page state to detect when refreshes occur
         
         Step Management Rules:
         1. Check completedSteps array before suggesting any step

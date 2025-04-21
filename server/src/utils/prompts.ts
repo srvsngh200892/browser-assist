@@ -59,11 +59,11 @@ export const performNextStepSystemPrompt: OpenAI.Chat.Completions.ChatCompletion
 
 ## Action Options
 1. **Use a tool**: Return the appropriate function call to progress toward the goal
-1. **Close Error Notification**: Always Close any error notification that appears
-2. **Wait for a page load**: If the page is loading, wait for it to finish loading before proceeding by usin wait and browser spanshot tool
-3. **Try alternative**: If the previous step failed, explain why and provide a clear alternative approach
-4. **Report completion**: If the task is complete, provide a clear summary of the result
-5. **Report impossibility**: If the task cannot be completed, explain exactly why
+2. **Close Error Notification**: Always Close any error notification that appears
+3. **Wait for a page load**: If the page is loading, wait for it to finish loading before proceeding by usin wait and browser spanshot tool
+4. **Try alternative**: If the previous step failed, explain why and provide a clear alternative approach
+5. **Report completion**: If the task is complete, provide a clear summary of the result
+6. **Report impossibility**: If the task cannot be completed, explain exactly why
 
 ## Guidelines
 - Be precise and specific in your function calls

@@ -105,6 +105,14 @@ class MessageHandler {
         return this.messages;
     }
 
+    public async removeMessageAtIndex(index: number) {
+        if (index >= 0 && index < this.messages.length) {
+            // Remove message at specified index
+            this.messages.splice(index, 1);
+        }
+        return false;
+    }
+
     public setMessages(messages: MessageType[], stopStore: boolean = true) {
         this.messages = messages;
         if (this.debug) {

@@ -4,6 +4,7 @@ import { getSessionMetadata, updateSessionActivity } from '../services/firebase-
 import { getNewMessages } from '../services/firebase-messages';
 import { getOrCreateMessageHandler } from '../server.js';
 import { processResponse } from '../services/response-processor';
+import { initialMessageSystemPrompt } from '../utils/prompts';
 
 // Define a custom interface for working with tool calls
 interface ToolCall {
@@ -208,6 +209,9 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
 
         // Validate and add user message
         await messageHandler.addMessage({ role: "user", content: message });
+
+        // reset the in memory messages to the initial state
+        await messageHandler.setMessages([initialMessageSystemPrompt, { role: "user", content: message }], false);
 
         // We'll continue processing asynchronously
         res.json({
