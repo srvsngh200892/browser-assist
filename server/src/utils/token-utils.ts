@@ -77,26 +77,81 @@ export async function summarizeConversation(messages: MessageType[], openai: any
         // This is used to create a summary focused on the tool interactions in the conversation
         // Assistant messages with tool_calls contain the requests to execute tools
         // Tool messages contain the responses from those tool executions
-        const toolCallMessages = messages.filter(m => (m.role === "assistant" && (m as any).tool_calls) || m.role === "tool");
+        const toolCallMessages = messages.filter(m => (m.role === "user" || m.role === "assistant" || m.role === "tool"));
         const prompt = [
             {
                 role: "system",
                 content: `
         You're an assistant that helps maintain conversational memory across long-running sessions.
-        Summarize the tools and responses in a way that preserves the sequence of tool calls and their responses. Assistant should be able to use this summary to continue the conversation.
-        Include important information from tool calls such as:
-        - Tool names and their purposes
-        - keep element and its ref in the tools (if present), in json fomrat for better understanding
-        - Any structured data or identifiers that need to be preserved
-        - Key arguments passed to tools
-        - Critical results or errors returned by tools
-        - Any state changes or important data discovered through tool usage
-        - The sequence and relationship between multiple tool calls
-              `.trim()
+        Analyze both the user's goal and tool responses and assistant messages to track progress and maintain forward momentum.
+        Provide your analysis in the following JSON structure:
+        {
+          "userGoal": "Brief description of user's primary goal",
+          "currentState": {
+            "lastOperation": {
+              "action": "What was last attempted",
+              "status": "success|failed|pending",
+              "error": "Error message if any",
+              "elementState": {} // Current state of relevant elements/refs
+            },
+            "completedSteps": [] // list of steps with ids that have been completed
+          },
+          "pendingSteps": [
+            {
+              "id": "unique_step_id",
+              "action": "Description of the step",
+              "prerequisite": "Any required previous step",
+              "requiredData": {},
+              "status": "blocked|ready"
+            }
+          ],
+          "errors": {
+            "current": "Description of current error if any",
+            "resolution": "Steps needed to resolve"
+          },
+          "nextAction": {
+            "step": "Immediate next action",
+            "context": "Required context for next action"
+          }
+        }
+
+        Progress Tracking Rules:
+        1. First, identify the user's primary goal from their messages
+        2. Review tool responses to determine:
+           - Which parts of the goal have been completed
+           - What steps are currently in progress
+           - What remains to be done
+        3. Only focus on PENDING and FUTURE steps that align with the user's goal
+        
+        Step Management Rules:
+        1. Check completedSteps array before suggesting any step
+        2. Never suggest or include steps that appear in completedSteps
+        3. Remove any step from pendingSteps immediately upon completion
+        4. Only track steps that are explicitly part of the user's current goal
+        5. When a step fails, only retain it if retry is necessary
+        
+        DO NOT:
+        - Include completed steps or achieved goals in detail
+        - Summarize tool calls that were successful and finished
+        - Include context from completed branches of the conversation
+        - Retain information that doesn't support next steps
+        - Track parallel paths not chosen by the user
+        - Suggest repeating any step marked as completed
+        `.trim()
             },
             {
                 role: "user",
-                content: toolCallMessages.map(m => `[${m.role.toUpperCase()}]: ${m.content || JSON.stringify((m as any).tool_calls)}`).join("\n")
+                content: toolCallMessages.map(m => {
+                    const role = `[${m.role.toUpperCase()}]: `;
+                    const contentPart = m.content ? `Content: ${m.content}` : '';
+                    const toolCallsPart = (m as any).tool_calls ? `Tool Calls: ${JSON.stringify((m as any).tool_calls)}` : '';
+
+                    if (contentPart && toolCallsPart) {
+                        return `${role}${contentPart}\n${toolCallsPart}`;
+                    } else {
+                        return `${role}${contentPart || toolCallsPart}`;
+                    }
+                }).join("\n")
             }
         ];
 
@@ -107,8 +162,19 @@ export async function summarizeConversation(messages: MessageType[], openai: any
             temperature: 0.2,
             timeout: timeout
         });
-        return summaryResponse.choices[0].message.content ||
-            "Conversation summarized due to length. Previous details condensed.";
+        const result = summaryResponse.choices[0].message.content;
+        try {
+            // Remove backticks and any JSON formatting that might be present
+            const cleanedResult = result.trim()
+                .replace(/^```(?:json)?|```$/g, '') // Remove code blocks with optional json tag
+                .replace(/^`+|`+$/g, '')           // Remove any remaining backticks
+                .trim();                           // Trim again after removing formatting
+            return JSON.stringify(JSON.parse(cleanedResult));
+        } catch (e) {
+            console.error("Failed to parse steps response:", e);
+            return JSON.stringify([]);
+        }
+
     } catch (error) {
         console.error("Error generating conversation summary:", error);
         return "Previous conversation was too long and has been condensed. Some context may be lost.";

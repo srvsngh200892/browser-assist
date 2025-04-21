@@ -78,13 +78,13 @@ export // Function to process responses asynchronously
                         await messageHandler.addMessages(toolCallResponse);
                     }
                     let summarizedMessagesAssistant: MessageType[] = []
-                    if (iteration > 0) {
-                        const summarizedMessages = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT, 5);
-                        summarizedMessagesAssistant = [{
-                            role: 'assistant',
-                            content: summarizedMessages
-                        } as unknown as MessageType];
-                    }
+                    messages = await messageHandler.getMessages();
+                    const summarizedMessages = await summarizeConversation(messages, openaiClient, OPENAI_MODEL, OPENAI_TIMEOUT, 5);
+                    summarizedMessagesAssistant = [{
+                        role: 'assistant',
+                        content: summarizedMessages
+                    } as unknown as MessageType];
+
                     console.log(`Summarized Messages Assistant: ${JSON.stringify(summarizedMessagesAssistant, null, 2)}`);
                     // Find the latest user message by iterating backwards through messages
                     let latestUserMessage: MessageType = { role: 'user', content: '' };
