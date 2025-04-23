@@ -136,17 +136,11 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         let isDone = false;
 
         if (messages.length > 0) {
-            const lastAssistantMessage = messages.filter((message) =>
-                message.role === 'assistant' && (message as MessageWithExtras).finish_reason === 'stop')[0];
-            console.log(`Session ${sessionId}: Last assistant message: ${JSON.stringify(lastAssistantMessage)}`);
+            const lastMessage = messages[messages.length - 1];
+            isDone = lastMessage.role === 'assistant' &&
+                (lastMessage as MessageWithExtras).finish_reason === 'stop';
 
-            // Now we can directly check the finish_reason on the message
-            if (lastAssistantMessage) {
-                // If the last message is an assistant message with finish_reason 'stop', we're done
-                isDone = true;
-            }
-
-            console.log(`Session ${sessionId}: Response isDone = ${isDone} (lastAssistantMessages role: ${lastAssistantMessage?.role}, finish_reason: ${(lastAssistantMessage as MessageWithExtras)?.finish_reason || 'none'})`);
+            console.log(`Session ${sessionId}: Response isDone = ${isDone} (lastMessage role: ${lastMessage.role}, finish_reason: ${(lastMessage as MessageWithExtras).finish_reason || 'none'})`);
         }
 
         // Update the last retrieval time
@@ -209,9 +203,6 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
 
         // Validate and add user message
         await messageHandler.addMessage({ role: "user", content: message });
-
-        // reset the in memory messages to the initial state
-        await messageHandler.setMessages([initialMessageSystemPrompt, { role: "user", content: message }], false);
 
         // We'll continue processing asynchronously
         res.json({

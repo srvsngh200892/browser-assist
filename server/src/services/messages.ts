@@ -13,12 +13,14 @@ import {
 import { updateSessionActivity } from "./firebase-sessions";
 
 // Define our message type to include all necessary properties
-export type MessageType = OpenAI.Chat.Completions.ChatCompletionMessageParam | OpenAI.Chat.Completions.ChatCompletionMessage | {
+export type MessageType = (OpenAI.Chat.Completions.ChatCompletionMessageParam | OpenAI.Chat.Completions.ChatCompletionMessage | {
     role: 'system' | 'user' | 'assistant' | 'tool' | 'function';
     content: string | null;
     id?: string;
     tool_calls?: Array<any>;
     finish_reason?: string;
+}) & {
+    tool_calls?: Array<any>;  // Ensure tool_calls is available on all types
 };
 
 class MessageHandler {
