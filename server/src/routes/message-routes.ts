@@ -4,6 +4,7 @@ import { getSessionMetadata, updateSessionActivity } from '../services/firebase-
 import { getNewMessages } from '../services/firebase-messages';
 import { getOrCreateMessageHandler } from '../server.js';
 import { processResponse } from '../services/response-processor';
+import { initialMessageSystemPrompt } from '../utils/prompts';
 
 // Define a custom interface for working with tool calls
 interface ToolCall {
@@ -135,17 +136,11 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         let isDone = false;
 
         if (messages.length > 0) {
-            const lastAssistantMessage = messages.filter((message) =>
-                message.role === 'assistant' && (message as MessageWithExtras).finish_reason === 'stop')[0];
-            console.log(`Session ${sessionId}: Last assistant message: ${JSON.stringify(lastAssistantMessage)}`);
+            const lastMessage = messages[messages.length - 1];
+            isDone = lastMessage.role === 'assistant' &&
+                (lastMessage as MessageWithExtras).finish_reason === 'stop';
 
-            // Now we can directly check the finish_reason on the message
-            if (lastAssistantMessage) {
-                // If the last message is an assistant message with finish_reason 'stop', we're done
-                isDone = true;
-            }
-
-            console.log(`Session ${sessionId}: Response isDone = ${isDone} (lastAssistantMessages role: ${lastAssistantMessage?.role}, finish_reason: ${(lastAssistantMessage as MessageWithExtras)?.finish_reason || 'none'})`);
+            console.log(`Session ${sessionId}: Response isDone = ${isDone} (lastMessage role: ${lastMessage.role}, finish_reason: ${(lastMessage as MessageWithExtras).finish_reason || 'none'})`);
         }
 
         // Update the last retrieval time

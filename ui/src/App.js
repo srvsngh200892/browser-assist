@@ -2461,8 +2461,13 @@ function App() {
                                                     <div className="message-icon">
                                                         {roleIcon}
                                                     </div>
-                                                    {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
-                                                    {message.id && <span className="message-id"> (ID: {message.id.substring(0, 6)}...)</span>}
+                                                    {/* Update this line to ensure consistent capitalization and only show ID for non-user messages */}
+                                                    {message.role === 'user' ? 'User' : (
+                                                        <>
+                                                            {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
+                                                            {message.id && <span className="message-id"> (ID: {message.id.substring(0, 6)}...)</span>}
+                                                        </>
+                                                    )}
                                                 </div>
 
                                                 <div className="message-content">
