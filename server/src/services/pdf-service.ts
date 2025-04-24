@@ -297,31 +297,25 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                 lineGap: styles.header.lineGap
             });
 
-        // Filter messages for user and the last assistant message
-        const userMessages = messages.filter(msg => msg.role === 'user');
-        const assistantMessages = messages.filter(msg => msg.role === 'assistant');
-        const lastAssistantMessage = assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : null;
+        // Display messages in conversation order (user, assistant, user, assistant, etc.)
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
 
-        // Add user messages
-        for (const message of userMessages) {
+            // Skip system messages
+            if (message.role === 'system' || message.role === 'tool' || message.tool_calls?.length > 0) continue;
+
             doc.font(styles.normal.font)
                 .fontSize(styles.normal.fontSize)
                 .font('Helvetica-Bold')
-                .text('User: ', { continued: true })
+                .text(`${message.role === 'user' ? 'User' : 'Assistant'}: `, { continued: true })
                 .font(styles.normal.font)
                 .text(message.content || 'Empty message')
                 .moveDown(0.5);
-        }
 
-        // Add last assistant message if it exists
-        if (lastAssistantMessage) {
-            doc.font(styles.normal.font)
-                .fontSize(styles.normal.fontSize)
-                .font('Helvetica-Bold')
-                .text('Assistant: ', { continued: true })
-                .font(styles.normal.font)
-                .text(lastAssistantMessage.content || 'Empty message')
-                .moveDown(1);
+            // Add extra space after assistant messages for better readability
+            if (message.role === 'assistant') {
+                doc.moveDown(0.5);
+            }
         }
 
         // Add screenshot pages in batches to manage memory

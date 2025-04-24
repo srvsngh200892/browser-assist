@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
 import { getSessionMetadata } from '../services/firebase-sessions';
 import { MessageHandler } from '../services/messages';
-import { mcpClient } from '../utils/client.js';
+import { getMcpClient } from '../utils/client';
 import sessionStore from '../services/session-store';
 import {
     getStreamState,
@@ -70,6 +70,7 @@ router.get("/screenshot", authMiddleware, async (req: AuthenticatedRequest, res:
 
         try {
             // Try to get screenshot from MCP browser_take_screenshot tool
+            const mcpClient = await getMcpClient(sessionId);
             const result = await mcpClient.callTool({
                 name: "browser_take_screenshot",
                 arguments: {}
@@ -267,6 +268,7 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
 
             // Call MCP for screenshot
             console.log(`Calling MCP for screenshot at ${Date.now() - startTime}ms`);
+            const mcpClient = await getMcpClient(sessionId);
             const result = await mcpClient.callTool({
                 name: "browser_take_screenshot",
                 arguments: {}
