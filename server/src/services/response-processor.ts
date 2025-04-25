@@ -3,7 +3,7 @@
 
 import { MessageHandler } from './messages';
 import { openaiClient } from '../server';
-import { mcpClient } from '../utils/client';
+import { getMcpClient } from '../utils/client';
 import {
     applyToolCallsIfPresent,
     isDone,
@@ -37,6 +37,7 @@ export // Function to process responses asynchronously
 
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
+        const mcpClient = await getMcpClient(sessionId);
         const mcpToolsList = await mcpClient.listTools();
         console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
         const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];

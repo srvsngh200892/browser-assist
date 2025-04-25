@@ -2,22 +2,27 @@ import express, { Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createServer } from "@playwright/mcp";
 
-const server = createServer({
-    launchOptions: { headless: true },
-});
 
 const app = express();
 const transports: { [sessionId: string]: SSEServerTransport } = {};
+
+const serverConfig = {
+    launchOptions: { headless: true },
+};
 
 app.get("/sse", async (_: Request, res: Response) => {
     const transport = new SSEServerTransport("/messages", res);
     transports[transport.sessionId] = transport;
     console.log("Transport created for sessionId:", transport.sessionId);
-    res.on("close", () => {
+
+    const server = createServer(serverConfig);
+    await server.connect(transport);
+
+    res.on("close", async () => {
         console.log("Transport closed for sessionId:", transport.sessionId);
         delete transports[transport.sessionId];
+        await server.close(); // Clean up the server when connection closes
     });
-    await server.connect(transport);
 });
 
 app.post("/messages", async (req: Request, res: Response) => {
