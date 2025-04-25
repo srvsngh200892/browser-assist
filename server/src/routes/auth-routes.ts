@@ -98,7 +98,6 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         // Hash password with salt
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-        console.log("Password hashed securely with salt");
 
         // Create user
         const userId = await createUser({
@@ -147,8 +146,6 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
             });
         }
 
-        console.log(`Processing logout request for session: ${sessionId}${deleteData ? ' (with data deletion)' : ''}`);
-
         // Get user information from the auth middleware
         const user = req.user;
         if (!user || !user.userId) {
@@ -178,7 +175,6 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
         // 1. Clear any stream state
         try {
             await clearStreamState(sessionId);
-            console.log(`Cleared stream state for session ${sessionId}`);
         } catch (streamError) {
             console.error(`Error clearing stream state for session ${sessionId}:`, streamError);
             // Continue with other cleanup even if stream state clear fails
@@ -187,22 +183,15 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
         // 2. Remove message handler from memory
         if (sessionStore.sessionExists(sessionId)) {
             sessionStore.removeSession(sessionId);
-            console.log(`Removed message handler for session ${sessionId}`);
         }
 
         // 3. Handle the session in Firebase based on deletion preference
         if (deleteData) {
             // Delete session data completely if requested
-            const deleteResult = await deleteSession(sessionId);
-            if (deleteResult) {
-                console.log(`Session ${sessionId} and all associated data deleted`);
-            } else {
-                console.error(`Failed to delete session ${sessionId} data`);
-            }
+            await deleteSession(sessionId);
         } else {
             // Otherwise just mark it as inactive
             await updateSessionActivity(sessionId, false);
-            console.log(`Marked session ${sessionId} as inactive`);
         }
 
         return res.json({

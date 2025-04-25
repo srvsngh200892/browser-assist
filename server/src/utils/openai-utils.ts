@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { callTool } from "./mcp";
 import type { MessageType } from "../services/messages";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { stringify } from "querystring";
 
 type OpenAiToolsInputType = {
     type: "function";
@@ -80,9 +81,10 @@ export const applyToolCallsIfPresent = async (
 
         switch (result.content[0].type) {
             case "text":
+                const data = sanitizeYamlLog(result.content[0].text);
                 toolCallResults.push({
                     role: "tool",
-                    content: result.content[0].text,
+                    content: data,
                     tool_call_id: toolCallId,
                 });
                 break;
@@ -115,3 +117,27 @@ export const isDone = (
 
     return response.choices[0].finish_reason === "stop";
 };
+
+function sanitizeYamlLog(log: string) {
+    const yamlBlockMatch = log.match(/```yaml\n([\s\S]*?)\n```/);
+    if (!yamlBlockMatch) return log;
+
+    const fullYamlBlock = yamlBlockMatch[0];
+    const yamlContent = yamlBlockMatch[1];
+
+    const yamlLines = yamlContent.split('\n');
+
+    // More permissive regex that allows nested structures and various attributes
+    const validLineRegex = /^(\s*)-.*(\[ref=\w+]|:\s*$)/;
+
+    const cleanedYaml = yamlLines
+        .filter(line => {
+            const trimmed = line.trimEnd();
+            // Keep empty lines and valid YAML lines
+            return !trimmed || validLineRegex.test(trimmed);
+        })
+        .join('\n');
+
+    const cleanedYamlBlock = '```yaml\n' + cleanedYaml + '\n```';
+    return log.replace(fullYamlBlock, cleanedYamlBlock);
+}

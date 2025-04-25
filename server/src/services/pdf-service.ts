@@ -200,9 +200,6 @@ function updatePdfGenerationProgress(sessionId: string, progress: number, status
             progress,
             statusMessage
         });
-
-        // Log progress update
-        console.log(`PDF generation progress for ${sessionId}: ${progress}% - ${statusMessage || ''}`);
     }
 }
 
@@ -330,7 +327,6 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
 
             let screenshotCounter = 1;
             const totalScreenshots = batchProcessor.getTotalCount();
-            console.log(`Processing ${totalScreenshots} screenshots for session ${sessionId}`);
 
             // Update progress
             updatePdfGenerationProgress(sessionId, 30, 'Processing screenshots');
@@ -342,14 +338,11 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
             // Process screenshots in batches
             do {
                 const currentBatch = batchProcessor.getCurrentBatch();
-                console.log(`Processing batch ${batchProcessor.getBatchCount() > 0 ? batchProcessor.getCurrentBatch().length : 0} screenshots`);
 
                 for (const screenshot of currentBatch) {
                     try {
                         if (screenshot.url) {
-                            // Log counter and total for progress tracking
-                            console.log(`Processing screenshot ${screenshotCounter}/${totalScreenshots}`);
-
+                            // Update progress
                             // Update progress
                             const currentProgress = baseProgress + (screenshotCounter * screenshotProgressIncrement);
                             updatePdfGenerationProgress(
@@ -372,7 +365,6 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                                 .moveDown(0.5);
 
                             // Download the image from Firebase
-                            console.log(`Downloading image from Firebase: ${screenshot.url}`);
                             const imageBuffer = await fetchImageAsBuffer(screenshot.url);
                             // Calculate image dimensions to fit on page
                             const maxWidth = 500;
@@ -486,7 +478,6 @@ async function storePdfInStorage(sessionId: string, pdfFilePath: string): Promis
     try {
         const filename = path.basename(pdfFilePath);
         const storagePath = `validations/${sessionId}/reports/${filename}`;
-        console.log(`Uploading PDF to Firebase Storage at path: ${storagePath}`);
 
         // Create a reference to the storage location
         const fileRef = ref(storage, storagePath);
@@ -501,7 +492,6 @@ async function storePdfInStorage(sessionId: string, pdfFilePath: string): Promis
 
         // Get the download URL
         const downloadUrl = await getDownloadURL(fileRef);
-        console.log(`PDF uploaded successfully. Download URL: ${downloadUrl}`);
 
         return downloadUrl;
     } catch (error) {

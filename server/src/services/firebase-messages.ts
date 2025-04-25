@@ -98,7 +98,6 @@ async function storeChunkedMessage(sessionId: string, message: MessageType, mess
 
         // Calculate how many chunks we need
         const chunkCount = Math.ceil(messageSize / MAX_CHUNK_SIZE);
-        console.log(`Message size ${messageSize} bytes exceeds limit. Splitting into ${chunkCount} chunks.`);
 
         // Create chunk references
         const chunksRef = collection(db, MESSAGE_CHUNKS_COLLECTION);
@@ -133,8 +132,6 @@ async function storeChunkedMessage(sessionId: string, message: MessageType, mess
 
             await setDoc(doc(chunksRef, chunkId), chunkDoc);
         }
-
-        console.log(`Successfully stored chunked message ${messageId} with ${chunkCount} chunks`);
         return messageId;
     } catch (error) {
         console.error("Error storing chunked message:", error);
@@ -195,7 +192,6 @@ export async function storeMessage(sessionId: string, message: MessageType) {
         };
 
         await setDoc(doc(messagesRef, messageId), messageData);
-        console.log(`Message stored with ID: ${messageId}`);
         return messageId;
     } catch (error) {
         console.error("Error storing message:", error);
@@ -278,8 +274,6 @@ export async function getSessionMessages(sessionId: string, lastRetrievalTime?: 
                 break;
             }
         }
-
-        console.log(`Retrieved ${messages.length} messages for session ${sessionId}, total size: ${totalPayloadSize} bytes`);
         return messages;
     } catch (error) {
         console.error(`Error getting session messages for ${sessionId}:`, error);
@@ -313,11 +307,8 @@ export async function sessionHasMessages(sessionId: string): Promise<boolean> {
 // Get only the last assistant message for a session
 export async function getLastAssistantMessage(sessionId: string): Promise<MessageType | null> {
     try {
-        console.log(`Getting last assistant message for session ${sessionId}`);
-
         // Use the same collection as other message functions
         const messagesRef = collection(db, MESSAGES_COLLECTION);
-        console.log(`Using collection: ${MESSAGES_COLLECTION}`);
 
         const q = query(
             messagesRef,
@@ -326,13 +317,10 @@ export async function getLastAssistantMessage(sessionId: string): Promise<Messag
             orderBy("timestamp", "desc"),
             limit(1)
         );
-        console.log(`Query created for last assistant message`);
 
         const snapshot = await getDocs(q);
-        console.log(`Query executed, empty: ${snapshot.empty}`);
 
         if (snapshot.empty) {
-            console.log(`No assistant messages found for session ${sessionId}`);
             return null;
         }
 

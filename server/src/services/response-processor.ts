@@ -12,6 +12,7 @@ import {
 
 import {
     estimateTokenCount,
+    getStructuredAutomationSteps,
     MAX_TOKEN_LIMIT,
     TOKEN_THRESHOLD,
 } from '../utils/token-utils';
@@ -42,7 +43,6 @@ export // Function to process responses asynchronously
         console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
         const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
-
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             try {
                 console.log(`Starting agent loop iteration ${iteration + 1}/${maxIterations}`);

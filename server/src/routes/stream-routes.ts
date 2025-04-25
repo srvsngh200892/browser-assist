@@ -37,11 +37,8 @@ router.post("/stream-disconnect", authMiddleware, async (req: AuthenticatedReque
         const { sessionId } = req.body;
 
         if (sessionId) {
-            console.log(`Stream disconnect request for session: ${sessionId}`);
-
             // Remove the session's stream state from Firebase
             await clearStreamState(sessionId);
-            console.log(`Cleared stream state for session ${sessionId} in Firebase`);
         }
 
         res.json({
@@ -89,10 +86,6 @@ router.get("/screenshot", authMiddleware, async (req: AuthenticatedRequest, res:
             screenshot = imageContent.data;
             mimeType = imageContent.mimeType || 'image/png';
 
-            // Add debugging to check screenshot content
-            console.log(`MCP Screenshot captured for session ${sessionId}: ${screenshot ? 'Success' : 'Empty'}`);
-            console.log(`MCP Screenshot size: ${screenshot ? screenshot.length : 0} bytes`);
-            console.log(`MCP Screenshot type: ${mimeType}`);
         } catch (error: unknown) {
             console.error(`Screenshot error for session ${sessionId}:`, error);
             statusMessage = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
@@ -155,7 +148,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
 
     // First check if the session exists in memory
     if (!sessionStore.sessionExists(sessionId)) {
-        console.log(`Session ${sessionId} not found in memory, checking Firebase...`);
 
         // If not in memory, check if it exists in Firebase
         const sessionData = await getSessionMetadata(sessionId);
@@ -170,7 +162,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
         }
 
         // Session exists in Firebase but not in memory, create it
-        console.log(`Session ${sessionId} found in Firebase, creating memory handler`);
         const messageHandler = new MessageHandler(sessionId);
         sessionStore.setMessageHandler(sessionId, messageHandler);
     }
@@ -192,8 +183,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
         expressRes.flush();
     }
 
-    console.log(`Browser stream started for session ${sessionId}`);
-
     // Flag to track if the connection is active
     let isStreamConnected = true;
 
@@ -203,7 +192,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     // Function to safely send data
     const safeSend = (data: string, operation = "unknown") => {
         if (!isStreamConnected) {
-            console.log(`Skipping send for ${operation}: stream disconnected`);
             return false;
         }
 
@@ -237,7 +225,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
         if (!isStreamConnected) return;
 
         const startTime = Date.now();
-        console.log(`Starting screenshot capture for session ${sessionId}`);
 
         try {
             // Check if the stream is paused
@@ -255,19 +242,15 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             };
 
             const stateCheckTime = Date.now();
-            console.log(`Stream state fetch took ${stateCheckTime - startTime}ms for session ${sessionId}`);
-            console.log(`Stream is paused for session ${streamState.active}, sending pause notification`);
 
             // If the stream is paused, send a status message and return
             if (!streamState.active) {
-                console.log(`Stream is paused for session ${sessionId}, sending pause notification`);
                 const pauseMessage = `event: status\ndata: {"type":"paused","message":"Stream paused","reason":"${streamState.pauseReason || 'client_request'}"}\n\n`;
                 safeSend(pauseMessage, "pause notification");
                 return;
             }
 
             // Call MCP for screenshot
-            console.log(`Calling MCP for screenshot at ${Date.now() - startTime}ms`);
             const mcpClient = await getMcpClient(sessionId);
             const result = await mcpClient.callTool({
                 name: "browser_take_screenshot",
@@ -275,7 +258,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             });
 
             const screenshotTime = Date.now();
-            console.log(`MCP screenshot capture took ${screenshotTime - stateCheckTime}ms for session ${sessionId}`);
 
             // Find image data
             if (!result || !result.content || !Array.isArray(result.content)) {
@@ -287,7 +269,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             );
 
             if (imageContent && imageContent.data) {
-                console.log(`Starting duplicate check at ${Date.now() - startTime}ms`);
                 // First, check if this is a new screenshot worth storing
                 const screenshotResult = await storeScreenshot(
                     sessionId,
@@ -298,20 +279,16 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                 );
 
                 const processTime = Date.now();
-                console.log(`Screenshot processing took ${processTime - screenshotTime}ms for session ${sessionId}`);
 
                 // Only send to the client if it's a new screenshot (not a duplicate)
-                console.log(`Screenshot result: ${JSON.stringify(screenshotResult)}`);
                 const message = `data: data:${imageContent.mimeType || 'image/png'};base64,${imageContent.data}\n\n`;
                 safeSend(message, "screenshot");
                 if (screenshotResult) {
                     const similarityInfo = screenshotResult.similarity
                         ? `, similarity: ${screenshotResult.similarity.toFixed(2)}%`
                         : '';
-                    console.log(`New screenshot detected for session ${sessionId}, hash: ${screenshotResult.hash.substring(0, 8)}...${similarityInfo}`);
 
                     // Send the screenshot data to the client only after confirming it's not a duplicate
-                    console.log(`Screenshot sent to client at ${Date.now() - startTime}ms for session ${sessionId}`);
 
                     // Update the last screenshot timestamp AND hash in Firebase
                     setStreamState(sessionId, {
@@ -324,8 +301,7 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                     // Only reset error count if we successfully processed a new screenshot
                     errorCount = 0;
                 } else {
-                    console.log(`Duplicate screenshot detected for session ${sessionId}, skipping send after ${Date.now() - startTime}ms total processing time`);
-
+                    // Send a status update to inform the client we're still active but no new image
                     // Send a status update to inform the client we're still active but no new image
                     const statusMsg = `event: status\ndata: {"type":"no_update","message":"No significant changes detected"}\n\n`;
                     safeSend(statusMsg, "no update notification");
@@ -405,8 +381,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             clearInterval(heartbeatInterval);
         }
 
-        console.log(`Browser stream closed for session ${sessionId}`);
-
         // Set stream as inactive but don't clear the state
         // This way screenshots are preserved for later viewing
         try {
@@ -415,7 +389,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                 pauseReason: 'stream_disconnected',
                 pausedAt: Date.now()
             });
-            console.log(`Set stream state to inactive for session ${sessionId}`);
         } catch (e) {
             console.error(`Failed to update stream state: ${e instanceof Error ? e.message : "Unknown error"}`);
         }
@@ -424,7 +397,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     // Set a maximum duration for the stream
     setTimeout(() => {
         if (isStreamConnected) {
-            console.log(`Maximum stream duration reached for session ${sessionId}`);
             isStreamConnected = false;
 
             if (screenshotInterval) {
@@ -456,8 +428,6 @@ router.post("/stream-control", authMiddleware, async (req: AuthenticatedRequest,
             });
         }
 
-        console.log(`Stream control request: ${action} for session ${sessionId} (reason: ${reason || 'not specified'})`);
-
         // Update the stream state in Firebase based on the action
         let success = false;
         if (action === 'pause') {
@@ -466,14 +436,12 @@ router.post("/stream-control", authMiddleware, async (req: AuthenticatedRequest,
                 pauseReason: reason || 'client_request',
                 pausedAt: Date.now()
             });
-            console.log(`Stream paused for session ${sessionId} in Firebase`);
         } else if (action === 'resume') {
             success = await setStreamState(sessionId, {
                 active: true,
                 pauseReason: '',
                 resumedAt: Date.now()
             });
-            console.log(`Stream resumed for session ${sessionId} in Firebase`);
         } else {
             return res.status(400).json({
                 success: false,

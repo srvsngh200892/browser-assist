@@ -59,7 +59,6 @@ async function compressScreenshot(base64Image: string): Promise<{ compressedImag
             throw new Error('Empty image data after removing data URL prefix');
         }
 
-        console.log(`Converting base64 to buffer, length: ${base64Data.length}`);
         let imageBuffer: Buffer;
 
         try {
@@ -70,7 +69,6 @@ async function compressScreenshot(base64Image: string): Promise<{ compressedImag
                 throw new Error('Failed to create buffer from base64 data');
             }
 
-            console.log(`Successfully created image buffer, size: ${imageBuffer.length} bytes`);
         } catch (error) {
             console.error('Buffer creation error:', error);
             throw new Error(`Failed to create buffer from image data: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -78,7 +76,6 @@ async function compressScreenshot(base64Image: string): Promise<{ compressedImag
 
         // Compress and convert to png
         try {
-            console.log('Starting image compression and conversion to png');
             const compressedBuffer = await sharp(imageBuffer)
                 .resize(1024, 768, { // Reduce dimensions
                     fit: 'inside',
@@ -90,7 +87,6 @@ async function compressScreenshot(base64Image: string): Promise<{ compressedImag
                 })
                 .toBuffer();
 
-            console.log(`Compression complete, new size: ${compressedBuffer.length} bytes`);
             return {
                 compressedImage: compressedBuffer.toString('base64'),
                 imageBuffer: compressedBuffer
@@ -113,18 +109,11 @@ async function calculatePerceptualSimilarity(imageBuffer: Buffer, lastHash?: str
 
         // If we don't have a previous hash, return zero similarity
         if (!lastHash || !lastHash.trim()) {
-            console.log('No previous hash provided for comparison');
             return { similarity: 0, hash: currentHash };
         }
 
         // Calculate Hamming distance between hashes
         const distance = hammingDistance(lastHash, currentHash);
-
-        // Log the actual hash and distance for debugging
-        console.log(`Hash comparison: 
-            Previous: ${lastHash.substring(0, 20)}... 
-            Current:  ${currentHash.substring(0, 20)}...
-            Hamming distance: ${distance}/64`);
 
         // Convert distance to similarity percentage (64 is max distance for pHash)
         // Lower distance means higher similarity
@@ -171,7 +160,6 @@ export async function storeScreenshot(
         // Check if image is blank or has loading
         const isBlank = await isScreenshotBlankOrWithLoading(compressResult.imageBuffer, blankImageThreshold);
         if (isBlank) {
-            console.log(`Detected blank image for session ${sessionId}, skipping`);
             return null;
         }
 
@@ -181,14 +169,10 @@ export async function storeScreenshot(
             lastPerceptualHash
         );
 
-        console.log(`Perceptual similarity: ${similarity.toFixed(2)}% for session ${sessionId}`);
 
         // Skip if image hasn't changed significantly based on threshold
         if (similarity >= similarityThreshold) {
-            console.log(`Image similarity (${similarity.toFixed(2)}%) above threshold (${similarityThreshold}%), skipping`);
             return null;
-        } else {
-            console.log(`Image differs significantly (${similarity.toFixed(2)}% similarity < ${similarityThreshold}% threshold), storing new screenshot`);
         }
 
         // Attempt to upload the image
@@ -261,7 +245,6 @@ async function updateScreenshotCount(sessionId: string): Promise<void> {
             }
         });
 
-        console.log(`Updated screenshot count for session ${sessionId} to ${newCount}`);
     } catch (error) {
         console.error(`Error updating screenshot count for session ${sessionId}:`, error);
     }
