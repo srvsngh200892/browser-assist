@@ -4,7 +4,7 @@ import { MessageType } from '../services/messages';
 
 
 // Token limits
-export const MAX_TOKEN_LIMIT = 16000; // Default for GPT-3.5-Turbo
+export const MAX_TOKEN_LIMIT = 20000;
 export const TOKEN_THRESHOLD = 0.8; // 80% of maximum
 
 // Estimate token count in a conversation
