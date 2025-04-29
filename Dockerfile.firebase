@@ -14,4 +14,4 @@ COPY . .
 # Expose ports for Firebase emulators
 EXPOSE 4000 8080 9099 9199
 
-CMD ["firebase", "emulators:start", "--only", "firestore,ui,storage"]
+CMD ["firebase", "emulators:start", "--only", "firestore,ui,storage","--project", "demo-local"]
