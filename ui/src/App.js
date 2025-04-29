@@ -1142,9 +1142,11 @@ function App() {
             const msg = messages[i];
 
             // For other messages, prefer ID if available
-            const key = msg.id ?
-                `${msg.role}:${msg.id}` :
-                `${msg.role}:${msg.created_at || Date.now()}`;
+            const key = msg.tool_call_id ?
+                `${msg.role}:${msg.tool_call_id}` :
+                msg.id ?
+                    `${msg.role}:${msg.id}` :
+                    `${msg.role}:${msg.created_at || Date.now()}`;
 
             // If we haven't seen this message yet, add it to the result
             if (!seen.has(key)) {
@@ -1449,8 +1451,7 @@ function App() {
         const userMessage = {
             id: messageId,
             role: 'user',
-            content: message,
-            created_at: new Date().toISOString()
+            content: message
         };
 
         // Update messages by appending the new message, but handle welcome message special case
@@ -1508,7 +1509,7 @@ function App() {
             // Send message to server
             console.log('SEND: Sending message to server');
             await axios.post(`${SERVER_URL}/api/chat/${sessionId}`, {
-                message
+                userMessage
             });
             console.log('SEND: Message sent successfully');
 
@@ -2401,20 +2402,15 @@ function App() {
 
                             <div className="chat-container" ref={chatContainerRef}>
                                 {messages
-                                    .filter(msg => {
-                                        // Log messages that are being filtered for debugging
-                                        const isVisible = (
-                                            // Always show user and assistant messages
-                                            ['user', 'assistant'].includes(msg.role) ||
-                                            // Only show tool and function messages when technical details are enabled
-                                            (showTechnicalMessages && ['tool', 'system', 'function'].includes(msg.role))
-                                        );
-
-                                        if (!isVisible && msg.role === 'assistant') {
-                                            console.log('WARNING: Assistant message filtered out:', msg);
+                                    .filter(message => {
+                                        // Regular Mode: Show only user-assistant conversation
+                                        if (!showTechnicalMessages) {
+                                            return message.role === 'user' ||
+                                                message.role === 'assistant' ||
+                                                message.is_welcome;
                                         }
-
-                                        return isVisible;
+                                        // Technical Mode: Show everything
+                                        return true;
                                     })
                                     .map((message, index) => {
                                         // Check if this message is in typing state
@@ -2480,7 +2476,7 @@ function App() {
                                                                 <div className="typing-cursor"></div>
                                                             </div>
                                                         </div>
-                                                    ) : message.role === 'function' || message.role === 'tool' ? (
+                                                    ) : (message.role === 'function' || message.role === 'tool') ? (
                                                         // Special formatting for tool/function responses
                                                         <pre className="tool-content">
                                                             {typeof message.content === 'string'
