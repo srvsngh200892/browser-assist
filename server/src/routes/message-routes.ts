@@ -165,9 +165,9 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         // Get or create message handler for this session
         const messageHandler = await getOrCreateMessageHandler(sessionId);
 
-        const { message } = req.body;
+        const { userMessage } = req.body;
 
-        if (!message || typeof message !== "string") {
+        if (!userMessage || typeof userMessage !== "object") {
             return res.status(400).json({
                 success: false,
                 error: "Invalid message format"
@@ -175,7 +175,7 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         }
 
         // Validate and add user message
-        await messageHandler.addMessage({ role: "user", content: message });
+        await messageHandler.addMessage(userMessage);
 
         // We'll continue processing asynchronously
         res.json({

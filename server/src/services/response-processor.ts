@@ -62,20 +62,21 @@ export // Function to process responses asynchronously
                 let totalToolCalls = interactions.filter(i => i.hasToolCalls).length;
                 let keepNToolInteractions = totalToolCalls
                 if (estimatedTokens > MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
+                    let newEstimatedTokens = 0
                     console.log(`Token limit threshold reached (${estimatedTokens} tokens). Reducing older tool interactions...`);
                     let newMessages: MessageType[] = messages
                     keepNToolInteractions = keepNToolInteractions - 1
                     while (keepNToolInteractions >= 2) {
                         const reconstructedMessages = reconstructMessages(interactions, keepNToolInteractions);
                         newMessages = [...initialMessages, ...reconstructedMessages];
-                        const tempTokens = estimateTokenCount(newMessages);
-                        if (tempTokens < MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
+                        newEstimatedTokens = estimateTokenCount(newMessages);
+                        if (newEstimatedTokens < MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
                             break;
                         }
                         keepNToolInteractions--
                     }
                     messages = newMessages
-                    console.log(`Reduced to ${keepNToolInteractions} tool interactions for session ${sessionId}`);
+                    console.log(`Reduced to ${keepNToolInteractions} tool interactions for session ${sessionId} wiht message length ${messages.length} and new estimated tokens ${newEstimatedTokens} `);
                 }
                 console.log(`Keeping ${keepNToolInteractions} tool interactions out of ${totalToolCalls} for session ${sessionId}`)
                 const { trimmedMessage, addedSystemPrompt } = await trimAndAddSystemPrompt(messages, messageHandler, performNextStepSystemPrompt, OPENAI_MODEL, openaiClient, interactions);
