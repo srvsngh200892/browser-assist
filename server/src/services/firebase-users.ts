@@ -43,7 +43,6 @@ export async function createUser({ username, email, password }: { username: stri
         };
 
         await setDoc(doc(usersRef, userId), userData);
-        console.log(`User created with ID: ${userId}`);
         return userId;
     } catch (error) {
         console.error("Error creating user:", error);

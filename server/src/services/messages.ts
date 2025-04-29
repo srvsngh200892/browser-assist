@@ -147,43 +147,34 @@ class MessageHandler {
 
     public async resetToInitialWithLastAssistantMessage(): Promise<void> {
         try {
-            console.log(`[${this.sessionId}] Starting resetToInitialWithLastAssistantMessage`);
 
             // Instead of loading all messages, we'll directly query for the last assistant message
-            console.log(`[${this.sessionId}] Calling getLastAssistantMessage`);
             const lastAssistantMessage = await getLastAssistantMessage(this.sessionId);
-            console.log(`[${this.sessionId}] Got last assistant message: ${lastAssistantMessage ? 'yes' : 'no'}`);
 
             // Set messages to initial prompt and last assistant message (if found)
             if (lastAssistantMessage) {
-                console.log(`[${this.sessionId}] Setting messages to initial prompt + last assistant message`);
                 this.messages = [initialMessageSystemPrompt, lastAssistantMessage];
-                console.log(`[${this.sessionId}] Messages set successfully with assistant message`);
             } else {
-                console.log(`[${this.sessionId}] Setting messages to initial prompt only (no assistant message found)`);
                 this.messages = [initialMessageSystemPrompt];
-                console.log(`[${this.sessionId}] Messages set successfully with initial prompt only`);
             }
 
             // Store the changes to Firebase too
-            console.log(`[${this.sessionId}] Storing updated messages to Firebase`);
             await this.storeMessages();
-            console.log(`[${this.sessionId}] Reset completed successfully`);
         } catch (error) {
             console.error(`[${this.sessionId}] Error resetting messages:`, error);
             // Fallback to just the initial prompt
             this.messages = [initialMessageSystemPrompt];
-            console.log(`[${this.sessionId}] Fallback to initial prompt only due to error`);
+        }
 
-            // Try to store the fallback messages
-            try {
-                await this.storeMessages();
-            } catch (storeError) {
-                console.error(`[${this.sessionId}] Error storing fallback messages:`, storeError);
-            }
+        // Try to store the fallback messages
+        try {
+            await this.storeMessages();
+        } catch (storeError) {
+            console.error(`[${this.sessionId}] Error storing fallback messages:`, storeError);
         }
     }
 }
+
 
 export { MessageHandler };
 

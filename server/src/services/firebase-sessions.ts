@@ -60,7 +60,6 @@ export async function createSession(
         };
 
         await setDoc(doc(sessionsRef, sessionId), sessionData);
-        console.log(`Session created in Firebase with ID: ${sessionId} for user: ${userId}`);
         return sessionId;
     } catch (error) {
         console.error("Error creating session:", error);
@@ -77,7 +76,6 @@ export async function getSessionMetadata(sessionId: string): Promise<SessionMeta
             return sessionDoc.data() as SessionMetadata;
         }
 
-        console.log(`No session found with ID: ${sessionId}`);
         return null;
     } catch (error) {
         console.error(`Error getting session metadata for ${sessionId}:`, error);
@@ -95,13 +93,11 @@ export async function updateSessionMetadata(
         const sessionDoc = await getDoc(sessionRef);
 
         if (!sessionDoc.exists()) {
-            console.log(`Cannot update non-existent session: ${sessionId}`);
             return false;
         }
 
         // Get existing session data
         const existingData = sessionDoc.data();
-        console.log(`Existing session data before update:`, existingData);
 
         // Combine existing data with updates, ensuring we preserve all fields
         const updatedData: Partial<SessionMetadata> = {
@@ -111,11 +107,7 @@ export async function updateSessionMetadata(
             lastActive: serverTimestamp()
         };
 
-        // Log the update operation
-        console.log(`Updating session ${sessionId} with data:`, updatedData);
-
         await setDoc(sessionRef, updatedData, { merge: true });
-        console.log(`Session ${sessionId} metadata updated successfully`);
         return true;
     } catch (error) {
         console.error(`Error updating session metadata for ${sessionId}:`, error);
@@ -170,7 +162,6 @@ export async function updateSessionActivity(sessionId: string, isActive: boolean
         const sessionDoc = await getDoc(sessionRef);
 
         if (!sessionDoc.exists()) {
-            console.log(`Cannot update activity for non-existent session: ${sessionId}`);
             return false;
         }
 
@@ -184,7 +175,6 @@ export async function updateSessionActivity(sessionId: string, isActive: boolean
             status: isActive ? 'active' : 'inactive'
         }, { merge: true });
 
-        console.log(`Session ${sessionId} activity updated. Status: ${isActive ? 'active' : 'inactive'}`);
         return true;
     } catch (error) {
         console.error(`Error updating session activity for ${sessionId}:`, error);
@@ -202,7 +192,6 @@ export async function setStreamState(
         const sessionDoc = await getDoc(sessionRef);
 
         if (!sessionDoc.exists()) {
-            console.log(`Cannot update stream state for non-existent session: ${sessionId}`);
             return false;
         }
 
@@ -224,7 +213,6 @@ export async function setStreamState(
             lastActive: serverTimestamp()
         }, { merge: true });
 
-        console.log(`Stream state updated for session ${sessionId}: ${JSON.stringify(updatedStreamState)}`);
         return true;
     } catch (error) {
         console.error(`Error updating stream state for ${sessionId}:`, error);
@@ -249,7 +237,6 @@ export async function getStreamState(sessionId: string): Promise<StreamState | n
             };
         }
 
-        console.log(`No session found with ID: ${sessionId} to get stream state`);
         return null;
     } catch (error) {
         console.error(`Error getting stream state for ${sessionId}:`, error);
@@ -264,7 +251,6 @@ export async function clearStreamState(sessionId: string): Promise<boolean> {
         const sessionDoc = await getDoc(sessionRef);
 
         if (!sessionDoc.exists()) {
-            console.log(`Cannot clear stream state for non-existent session: ${sessionId}`);
             return false;
         }
 
@@ -277,7 +263,6 @@ export async function clearStreamState(sessionId: string): Promise<boolean> {
         // Update the session doc, effectively removing the streamState field
         await setDoc(sessionRef, updatedData);
 
-        console.log(`Stream state cleared for session ${sessionId}`);
         return true;
     } catch (error) {
         console.error(`Error clearing stream state for ${sessionId}:`, error);
@@ -293,7 +278,6 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
         const sessionDoc = await getDoc(sessionRef);
 
         if (!sessionDoc.exists()) {
-            console.log(`Cannot delete non-existent session: ${sessionId}`);
             return false;
         }
 
@@ -331,7 +315,6 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
             await currentBatch.commit();
         }
 
-        console.log(`Session ${sessionId} and ${messageCount} messages deleted successfully`);
         return true;
     } catch (error) {
         console.error(`Error deleting session ${sessionId}:`, error);

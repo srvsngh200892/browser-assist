@@ -49,8 +49,6 @@ router.get('/validation/report/:sessionId', authMiddleware, async (req: any, res
             });
         }
 
-        console.log(`Generating validation report for session ${sessionId}`);
-
         // Start the PDF generation process
         const { stream, filename } = await getValidationReportStream(sessionId);
 
@@ -183,9 +181,6 @@ router.post('/validation/report/:sessionId/generate', authMiddleware, async (req
                 error: 'You do not have permission to access this session'
             });
         }
-
-        console.log(`Starting background validation report generation for session ${sessionId}`);
-
         // Start the background generation process
         const result = await startBackgroundValidationReport(sessionId);
 

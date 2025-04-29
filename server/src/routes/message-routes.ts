@@ -93,7 +93,6 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         if (lastQueryTime > 0 && since) {
             // Only get new messages since the last retrieval
             messages = await getNewMessages(sessionId, lastQueryTime);
-            console.log(`Fetched ${messages.length} new messages for session ${sessionId} since ${new Date(lastQueryTime).toISOString()}`);
         } else {
             // Get all messages for the session
             messages = await messageHandler.getMessages(true); // Force reload from Firebase
@@ -107,31 +106,6 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         // Get only the paginated subset of messages
         const paginatedMessages = messages.slice(startIndex, endIndex);
 
-        console.log(`Session ${sessionId}: Returning ${paginatedMessages.length} messages (page ${page}, limit ${limit}, total ${totalCount})`);
-
-        // Add debug logging to check if tool_calls are present in the messages
-        const hasTool = paginatedMessages.some((m) => {
-            const msgWithExtras = m as MessageWithExtras;
-            return msgWithExtras.tool_calls && msgWithExtras.tool_calls.length > 0;
-        });
-        if (hasTool) {
-            console.log(`Session ${sessionId}: Found messages with tool_calls`);
-
-            // Log the first message with tool_calls for debugging
-            const toolMessage = paginatedMessages.find((m) => {
-                const msgWithExtras = m as MessageWithExtras;
-                return msgWithExtras.tool_calls && msgWithExtras.tool_calls.length > 0;
-            });
-            if (toolMessage) {
-                const toolMessageExtras = toolMessage as MessageWithExtras;
-                console.log(`Tool message example: ${JSON.stringify({
-                    role: toolMessage.role || 'unknown',
-                    tool_calls_count: toolMessageExtras.tool_calls?.length || 0,
-                    first_tool: toolMessageExtras.tool_calls?.[0]?.function?.name || 'none'
-                })}`);
-            }
-        }
-
         // Determine if processing is complete
         let isDone = false;
 
@@ -140,7 +114,6 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
             isDone = lastMessage.role === 'assistant' &&
                 (lastMessage as MessageWithExtras).finish_reason === 'stop';
 
-            console.log(`Session ${sessionId}: Response isDone = ${isDone} (lastMessage role: ${lastMessage.role}, finish_reason: ${(lastMessage as MessageWithExtras).finish_reason || 'none'})`);
         }
 
         // Update the last retrieval time

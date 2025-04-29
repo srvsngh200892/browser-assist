@@ -1,7 +1,4 @@
-// Temporary placeholder for response-processor.ts
-// Replace with actual implementation
-
-import { MessageHandler } from './messages';
+import { MessageHandler, MessageType } from './messages';
 import { openaiClient } from '../server';
 import { getMcpClient } from '../utils/client';
 import {
@@ -12,6 +9,7 @@ import {
 
 import {
     estimateTokenCount,
+    getStructuredAutomationSteps,
     MAX_TOKEN_LIMIT,
     TOKEN_THRESHOLD,
 } from '../utils/token-utils';
@@ -33,7 +31,6 @@ import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 export // Function to process responses asynchronously
     async function processResponse(sessionId: string, messageHandler: MessageHandler) {
     try {
-        const KEEP_LAST_N_TOOL_INTERACTIONS = 3;
 
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
@@ -42,43 +39,56 @@ export // Function to process responses asynchronously
         console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
         const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
-
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             try {
                 console.log(`Starting agent loop iteration ${iteration + 1}/${maxIterations}`);
                 let messages = await messageHandler.getMessages();
-                console.log(`Before Messages: ${JSON.stringify(messages, null, 2)}`);
+                console.log(`Before Messages: ${messages.length}`);
                 const estimatedTokens = estimateTokenCount(messages);
                 console.log(`Estimated tokens Before trimming: ${estimatedTokens}`);
 
-                // Find the last user message index
-                const lastUserIndex = messages.length - 1 - [...messages].reverse().findIndex(m => m.role === 'user');
-                if (lastUserIndex === -1) {
+                // Find the first user message index
+                const firstUserIndex = messages.findIndex(m => m.role === 'user');
+                if (firstUserIndex === -1) {
                     console.warn('No user message found in conversation');
                     return;
                 }
 
-                const initialMessages = messages.slice(0, lastUserIndex + 1);
-                const workingMessages = messages.slice(lastUserIndex + 1);
+                const initialMessages = messages.slice(0, firstUserIndex + 1);
+                const workingMessages = messages.slice(firstUserIndex + 1);
 
                 // Use the imported utility functions
                 const interactions = groupMessagesIntoInteractions(workingMessages);
-                const reconstructedMessages = reconstructMessages(interactions, KEEP_LAST_N_TOOL_INTERACTIONS);
-
-                // Combine all messages
-                messages = [...initialMessages, ...reconstructedMessages];
-                const { messages: trimmedMessages, addedSystemPrompt } = await trimAndAddSystemPrompt(messages, messageHandler, performNextStepSystemPrompt);
-                messages = trimmedMessages;
+                let totalToolCalls = interactions.filter(i => i.hasToolCalls).length;
+                let keepNToolInteractions = totalToolCalls
+                if (estimatedTokens > MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
+                    console.log(`Token limit threshold reached (${estimatedTokens} tokens). Reducing older tool interactions...`);
+                    let newMessages: MessageType[] = messages
+                    keepNToolInteractions = keepNToolInteractions - 1
+                    while (keepNToolInteractions >= 2) {
+                        const reconstructedMessages = reconstructMessages(interactions, keepNToolInteractions);
+                        newMessages = [...initialMessages, ...reconstructedMessages];
+                        const tempTokens = estimateTokenCount(newMessages);
+                        if (tempTokens < MAX_TOKEN_LIMIT * TOKEN_THRESHOLD) {
+                            break;
+                        }
+                        keepNToolInteractions--
+                    }
+                    messages = newMessages
+                    console.log(`Reduced to ${keepNToolInteractions} tool interactions for session ${sessionId}`);
+                }
+                console.log(`Keeping ${keepNToolInteractions} tool interactions out of ${totalToolCalls} for session ${sessionId}`)
+                const { trimmedMessage, addedSystemPrompt } = await trimAndAddSystemPrompt(messages, messageHandler, performNextStepSystemPrompt, OPENAI_MODEL, openaiClient, interactions);
                 const response = await openaiClient.chat.completions.create({
                     model: OPENAI_MODEL,
                     temperature: 0.2,
-                    messages: messages as any,
+                    messages: trimmedMessage as any,
                     tools: openAiTools
                 });
 
                 // Remove the performNextStepSystemPrompt if we added it
                 if (addedSystemPrompt) {
-                    messages.pop();
+                    trimmedMessage.pop();
                 }
                 // Propagate finish_reason from response to the assistant message
                 // Create a new message object with the finish_reason added
