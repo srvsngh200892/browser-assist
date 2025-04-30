@@ -19,7 +19,7 @@ const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3003/sse"
 
 const DEBUG = process.env.DEBUG === "true";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_TIMEOUT = parseInt(process.env.OPENAI_TIMEOUT || "20", 10);
+const OPENAI_TIMEOUT = parseInt(process.env.OPENAI_TIMEOUT || "60000", 60000);
 
 // Firebase Configuration
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
