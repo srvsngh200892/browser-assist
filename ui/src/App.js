@@ -1379,13 +1379,178 @@ function App() {
         }
     }, [addStatusMessage]);
 
+    /**
+     * Start browser stream
+     */
+    const startStream = useCallback((options = {}) => {
+        if (!sessionId || (streaming && !options.isResume)) {
+            console.log('STREAM DEBUG: Cannot start stream - conditions not met', {
+                hasSession: !!sessionId,
+                isStreaming: streaming,
+                isResume: options.isResume
+            });
+            return;
+        }
+
+        // Clean up any existing stream first
+        cleanupStream();
+
+        // Set streaming to true immediately for better visual feedback
+        setStreaming(true);
+        setStreamStatus('connecting');
+        addStatusMessage('info', options.isResume ? 'Resuming browser stream...' : 'Starting browser stream...');
+        console.log('STREAM DEBUG: Starting stream with session ID:', sessionId);
+
+        // Connection timeout ID for cleanup
+        let connectionTimeoutId = null;
+
+        try {
+            // Close any existing stream
+            cleanupStream();
+
+            // Create EventSource directly without redundant health check
+            const streamUrl = `${SERVER_URL}/api/browser-stream/${sessionId}?_t=${Date.now()}`;
+            console.log('STREAM DEBUG: EventSource URL:', streamUrl);
+
+            try {
+                const source = new EventSource(streamUrl);
+                console.log('STREAM DEBUG: EventSource created, readyState:', source.readyState,
+                    '(0=connecting, 1=open, 2=closed)');
+                console.log('STREAM DEBUG: Setting up EventSource handlers...');
+
+                // Set connection timeout
+                connectionTimeoutId = setTimeout(() => {
+                    console.error('STREAM DEBUG: Timeout triggered - connection timed out after 10 seconds');
+                    console.error('STREAM DEBUG: EventSource readyState at timeout:', source.readyState);
+
+                    addStatusMessage('error', 'Stream connection timed out - will retry');
+                    if (source && source.readyState !== 2) { // Not closed
+                        console.log('STREAM DEBUG: Closing EventSource due to timeout');
+                        source.close();
+                    }
+
+                    // Auto-retry after short delay with increasing backoff
+                    if (!window.streamRetryCount) {
+                        window.streamRetryCount = 0;
+                    }
+
+                    window.streamRetryCount++;
+                    const backoffDelay = Math.min(window.streamRetryCount * 1000, 5000);
+
+                    setTimeout(() => {
+                        if (sessionId && !streaming) {
+                            console.log(`STREAM DEBUG: Auto-retrying stream connection (attempt ${window.streamRetryCount})...`);
+                            startStream();
+                        }
+                    }, backoffDelay);
+                }, 10000);
+
+                // Handle connection open
+                source.onopen = () => {
+                    console.log('STREAM DEBUG: EventSource.onopen fired! Connection succeeded.');
+                    console.log('STREAM DEBUG: EventSource readyState in onopen:', source.readyState);
+
+                    clearTimeout(connectionTimeoutId);
+                    connectionTimeoutId = null;
+
+                    // Reset retry count on successful connection
+                    window.streamRetryCount = 0;
+
+                    setStreamStatus('active');
+                    setStreaming(true);
+                    addStatusMessage('success', 'Stream connected successfully');
+                };
+
+                // Handle messages
+                source.onmessage = (event) => {
+                    console.log('STREAM DEBUG: Received message event:', event.type, 'Data length:', event.data?.length || 0);
+
+                    // Process image data
+                    if (event.data && event.data.startsWith('data:image')) {
+                        console.log('STREAM DEBUG: Image received, length:', event.data.length);
+                        setBrowserImage(event.data);
+                    } else {
+                        console.log('STREAM DEBUG: Received non-image data:', event.data);
+                    }
+                };
+
+                // Handle specific events
+                source.addEventListener('status', (event) => {
+                    console.log('STREAM DEBUG: Received status event:', event.type, 'Data:', event.data);
+
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('STREAM DEBUG: Status update from stream:', data);
+                        addStatusMessage(data.type || 'info', data.message || 'Stream update');
+                    } catch (e) {
+                        console.error('STREAM DEBUG: Error parsing status event:', e);
+                    }
+                });
+
+                // Handle errors
+                source.onerror = (error) => {
+                    console.error('STREAM DEBUG: EventSource error:', error);
+                    console.error('STREAM DEBUG: EventSource readyState in onerror:', source.readyState);
+
+                    if (source.readyState === 2) { // CLOSED
+                        console.error('STREAM DEBUG: EventSource connection CLOSED');
+                        addStatusMessage('error', 'Stream connection closed by server');
+                        if (connectionTimeoutId) {
+                            clearTimeout(connectionTimeoutId);
+                            connectionTimeoutId = null;
+                        }
+                        setStreaming(false);
+                        setStreamStatus('error');
+                        // Try fallback polling
+                        tryPollingFallback();
+                    } else {
+                        console.warn('STREAM DEBUG: EventSource error but connection still open');
+                        addStatusMessage('warning', 'Stream connection error - will try to continue');
+                    }
+                };
+
+                // Store reference for cleanup
+                streamSourceRef.current = source;
+                console.log('STREAM DEBUG: EventSource setup complete');
+            } catch (err) {
+                console.error('STREAM DEBUG: Error creating EventSource:', err);
+                addStatusMessage('error', `Stream connection error: ${err.message}`);
+                setStreamStatus('error');
+
+                // Clear timeout
+                if (connectionTimeoutId) {
+                    clearTimeout(connectionTimeoutId);
+                    connectionTimeoutId = null;
+                }
+
+                // Fall back to polling
+                tryPollingFallback();
+            }
+        } catch (err) {
+            console.error('STREAM DEBUG: Fatal error creating stream connection:', err);
+            addStatusMessage('error', `Stream connection error: ${err.message}`);
+            setStreamStatus('error');
+
+            // Clear timeout
+            if (connectionTimeoutId) {
+                clearTimeout(connectionTimeoutId);
+                connectionTimeoutId = null;
+            }
+
+            // Fall back to polling
+            tryPollingFallback();
+        }
+    }, [sessionId, streaming, addStatusMessage, cleanupStream]);
 
     /**
- * Resume stream when user sends a new message
- */
+     * Resume stream when user sends a new message
+     */
     const resumeStream = useCallback(() => {
-        if (sessionId && streaming && streamStatus === 'waiting') {
-            console.log('STREAM DEBUG: Resuming stream for new activity');
+        if (sessionId && streamStatus === 'waiting') {
+            console.log('STREAM DEBUG: Resuming stream from waiting state');
+
+            // First clean up any existing stream connection
+            cleanupStream();
 
             // Notify server to resume sending data
             try {
@@ -1393,19 +1558,24 @@ function App() {
                     sessionId: sessionId,
                     action: 'resume'
                 }).catch(err => console.log('Server may not support stream resuming yet'));
-                setStreamStatus('active');
+
+                // Create a new stream connection
+                setTimeout(() => {
+                    console.log('STREAM DEBUG: Creating new stream connection after resume');
+                    startStream({ isResume: true });
+                }, 500);
+
+                setStreamStatus('connecting');
                 const responseCompleteKey = `response-complete-${sessionId}`;
                 localStorage.removeItem(responseCompleteKey);
             } catch (err) {
-                console.error('Error in stream resume notification:', err);
+                console.error('Error in stream resume:', err);
+                addStatusMessage('error', 'Failed to resume stream');
+                setStreamStatus('error');
             }
-
-            // Refresh the image once to ensure we have fresh content
-            setTimeout(() => {
-                takeScreenshot();
-            }, 500);
         }
-    }, [sessionId, streaming, streamStatus, setStreamStatus, takeScreenshot]);
+    }, [sessionId, streamStatus, setStreamStatus, cleanupStream, startStream, addStatusMessage]);
+
 
     /**
      * Handle sending a message
@@ -1605,163 +1775,6 @@ function App() {
     }, [sessionId, setLoading, setMessages, setStreamingContent, pollForMessages, handleSessionExpired, addStatusMessage, clearMessageHistory, resumeStream, streaming, streamStatus]);
 
     /**
-     * Start browser stream 
-     */
-    const startStream = useCallback((options = {}) => {
-        if (!sessionId || streaming) {
-            console.log('STREAM DEBUG: Cannot start stream - sessionId or streaming conditions not met',
-                { hasSession: !!sessionId, isStreaming: streaming });
-            return;
-        }
-
-        // Set streaming to true immediately for better visual feedback
-        setStreaming(true);
-        setStreamStatus('connecting');
-        addStatusMessage('info', 'Starting browser stream...');
-        console.log('STREAM DEBUG: Starting stream with session ID:', sessionId);
-
-        // Connection timeout ID for cleanup
-        let connectionTimeoutId = null;
-
-        try {
-            // Close any existing stream
-            cleanupStream();
-
-            // Create EventSource directly without redundant health check
-            const streamUrl = `${SERVER_URL}/api/browser-stream/${sessionId}?_t=${Date.now()}`;
-            console.log('STREAM DEBUG: EventSource URL:', streamUrl);
-
-            try {
-                const source = new EventSource(streamUrl);
-                console.log('STREAM DEBUG: EventSource created, readyState:', source.readyState,
-                    '(0=connecting, 1=open, 2=closed)');
-                console.log('STREAM DEBUG: Setting up EventSource handlers...');
-
-                // Set connection timeout
-                connectionTimeoutId = setTimeout(() => {
-                    console.error('STREAM DEBUG: Timeout triggered - connection timed out after 10 seconds');
-                    console.error('STREAM DEBUG: EventSource readyState at timeout:', source.readyState);
-
-                    addStatusMessage('error', 'Stream connection timed out - will retry');
-                    if (source && source.readyState !== 2) { // Not closed
-                        console.log('STREAM DEBUG: Closing EventSource due to timeout');
-                        source.close();
-                    }
-
-                    // Auto-retry after short delay with increasing backoff
-                    if (!window.streamRetryCount) {
-                        window.streamRetryCount = 0;
-                    }
-
-                    window.streamRetryCount++;
-                    const backoffDelay = Math.min(window.streamRetryCount * 1000, 5000);
-
-                    setTimeout(() => {
-                        if (sessionId && !streaming) {
-                            console.log(`STREAM DEBUG: Auto-retrying stream connection (attempt ${window.streamRetryCount})...`);
-                            startStream();
-                        }
-                    }, backoffDelay);
-                }, 10000);
-
-                // Handle connection open
-                source.onopen = () => {
-                    console.log('STREAM DEBUG: EventSource.onopen fired! Connection succeeded.');
-                    console.log('STREAM DEBUG: EventSource readyState in onopen:', source.readyState);
-
-                    clearTimeout(connectionTimeoutId);
-                    connectionTimeoutId = null;
-
-                    // Reset retry count on successful connection
-                    window.streamRetryCount = 0;
-
-                    setStreamStatus('active');
-                    setStreaming(true);
-                    addStatusMessage('success', 'Stream connected successfully');
-                };
-
-                // Handle messages
-                source.onmessage = (event) => {
-                    console.log('STREAM DEBUG: Received message event:', event.type, 'Data length:', event.data?.length || 0);
-
-                    // Process image data
-                    if (event.data && event.data.startsWith('data:image')) {
-                        console.log('STREAM DEBUG: Image received, length:', event.data.length);
-                        setBrowserImage(event.data);
-                    } else {
-                        console.log('STREAM DEBUG: Received non-image data:', event.data);
-                    }
-                };
-
-                // Handle specific events
-                source.addEventListener('status', (event) => {
-                    console.log('STREAM DEBUG: Received status event:', event.type, 'Data:', event.data);
-
-                    try {
-                        const data = JSON.parse(event.data);
-                        console.log('STREAM DEBUG: Status update from stream:', data);
-                        addStatusMessage(data.type || 'info', data.message || 'Stream update');
-                    } catch (e) {
-                        console.error('STREAM DEBUG: Error parsing status event:', e);
-                    }
-                });
-
-                // Handle errors
-                source.onerror = (error) => {
-                    console.error('STREAM DEBUG: EventSource error:', error);
-                    console.error('STREAM DEBUG: EventSource readyState in onerror:', source.readyState);
-
-                    if (source.readyState === 2) { // CLOSED
-                        console.error('STREAM DEBUG: EventSource connection CLOSED');
-                        addStatusMessage('error', 'Stream connection closed by server');
-                        if (connectionTimeoutId) {
-                            clearTimeout(connectionTimeoutId);
-                            connectionTimeoutId = null;
-                        }
-                        setStreaming(false);
-                        setStreamStatus('error');
-                        // Try fallback polling
-                        tryPollingFallback();
-                    } else {
-                        console.warn('STREAM DEBUG: EventSource error but connection still open');
-                        addStatusMessage('warning', 'Stream connection error - will try to continue');
-                    }
-                };
-
-                // Store reference for cleanup
-                streamSourceRef.current = source;
-                console.log('STREAM DEBUG: EventSource setup complete');
-            } catch (err) {
-                console.error('STREAM DEBUG: Error creating EventSource:', err);
-                addStatusMessage('error', `Stream connection error: ${err.message}`);
-                setStreamStatus('error');
-
-                // Clear timeout
-                if (connectionTimeoutId) {
-                    clearTimeout(connectionTimeoutId);
-                    connectionTimeoutId = null;
-                }
-
-                // Fall back to polling
-                tryPollingFallback();
-            }
-        } catch (err) {
-            console.error('STREAM DEBUG: Fatal error creating stream connection:', err);
-            addStatusMessage('error', `Stream connection error: ${err.message}`);
-            setStreamStatus('error');
-
-            // Clear timeout
-            if (connectionTimeoutId) {
-                clearTimeout(connectionTimeoutId);
-                connectionTimeoutId = null;
-            }
-
-            // Fall back to polling
-            tryPollingFallback();
-        }
-    }, [sessionId, streaming, streamStatus, addStatusMessage, cleanupStream]);
-
-    /**
      * Fall back to polling
      */
     const tryPollingFallback = useCallback(() => {
@@ -1799,10 +1812,10 @@ function App() {
      * Stop browser stream
      */
     const stopStream = useCallback(() => {
-        console.log('Stopping stream');
+        console.log('STREAM DEBUG: Stopping stream');
 
         try {
-            // Just use our cleanupStream helper
+            // Clean up the stream connection
             cleanupStream();
 
             // Update state
@@ -1813,13 +1826,10 @@ function App() {
 
             addStatusMessage('info', 'Stream connection closed');
         } catch (err) {
-            console.error('Error stopping stream:', err);
+            console.error('STREAM DEBUG: Error stopping stream:', err);
             // Still update state even if cleanup fails
             setStreaming(false);
             setStreamStatus('inactive');
-
-            // Don't reset the browser image on error either
-
             addStatusMessage('warning', `Stream connection closed with errors: ${err.message}`);
         }
     }, [addStatusMessage, cleanupStream]);
