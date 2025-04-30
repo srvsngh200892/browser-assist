@@ -306,7 +306,7 @@ function App() {
     }, [setSessionId]);
 
 
-    const handleLogout = useCallback((deleteData = false) => {
+    const handleLogout = useCallback((deleteData = true) => {
         // Get the current session ID
         const currentSessionId = sessionIdRef.current;
         console.log('LOGOUT DEBUG: Current session ID:', currentSessionId);

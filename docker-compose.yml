@@ -36,15 +36,15 @@ services:
     env_file:
       - ./server/src/.env
     environment:
-      # This ensures the container uses the correct hostname for the Firebase emulator
       - FIREBASE_EMULATOR_HOST=browser-assist-firebase
-      # Connect to Playwright SSE server - Using container name instead of localhost
       - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/sse
     volumes:
-      - ./src:/app/src  # For development hot-reloading
+      - ./src:/app/src
     depends_on:
-      - firebase
-      - playwright-sse-mcp-server
+      firebase:
+        condition: service_healthy
+      playwright-sse-mcp-server:
+        condition: service_started
     networks:
       - app-network
 

@@ -35,9 +35,10 @@ export // Function to process responses asynchronously
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
         const mcpClient = await getMcpClient(sessionId);
-        const mcpToolsList = await mcpClient.listTools();
+        let mcpToolsList: any = await mcpClient.listTools();
         console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
-        const toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
+        let toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
+        toolsArray = toolsArray.filter((tool: any) => tool.name !== 'browser_take_screenshot');
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             try {
@@ -84,7 +85,7 @@ export // Function to process responses asynchronously
                     model: OPENAI_MODEL,
                     temperature: 0.2,
                     messages: trimmedMessage as any,
-                    tools: openAiTools
+                    tools: openAiTools,
                 });
 
                 // Remove the performNextStepSystemPrompt if we added it
