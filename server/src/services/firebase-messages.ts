@@ -49,9 +49,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-
-
-// get Firestore
+// Get Firestore
 const db = getFirestore();
 
 // Connect to Firebase emulator if enabled
@@ -71,6 +69,7 @@ const MESSAGE_CHUNKS_COLLECTION = "message_chunks";
 
 // Helper to estimate the size of a message
 function estimateMessageSize(message: any): number {
+    console.log(`estimateMessageSize ${new TextEncoder().encode(JSON.stringify(message)).length}`);
     return new TextEncoder().encode(JSON.stringify(message)).length;
 }
 
@@ -107,17 +106,17 @@ async function storeChunkedMessage(sessionId: string, message: MessageType, mess
 
         await setDoc(doc(messagesRef, messageId), metadataDoc);
 
-        // Store chunks
+        // Store chunks using TextEncoder for UTF-8 safety
         for (let i = 0; i < chunkCount; i++) {
             const start = i * MAX_CHUNK_SIZE;
             const end = Math.min(start + MAX_CHUNK_SIZE, messageContent.length);
-            const chunk = messageContent.substring(start, end);
+            const chunkSlice = messageContent.slice(start, end);
 
             const chunkId = `${messageId}_chunk_${i}`;
             const chunkDoc = {
                 messageId,
                 chunkIndex: i,
-                content: chunk,
+                content: chunkSlice, // Store content as plain text
                 timestamp: serverTimestamp()
             };
 
@@ -133,6 +132,7 @@ async function storeChunkedMessage(sessionId: string, message: MessageType, mess
 // Helper function to retrieve a chunked message
 async function getChunkedMessage(messageId: string, metadata: any): Promise<MessageType> {
     try {
+        console.log(`Getting chunked message ${messageId}`);
         const { chunkCount, role } = metadata;
         const chunksRef = collection(db, MESSAGE_CHUNKS_COLLECTION);
 
@@ -208,6 +208,7 @@ export async function storeMessages(sessionId: string, messages: MessageType[]) 
 export async function getSessionMessages(sessionId: string, lastRetrievalTime?: number): Promise<MessageType[]> {
     try {
         const messagesRef = collection(db, MESSAGES_COLLECTION);
+        console.log(`getSessionMessages Getting session messages for ${sessionId} lastRetrievalTime: ${lastRetrievalTime}`);
         let messagesQuery = query(
             messagesRef,
             where("sessionId", "==", sessionId),
@@ -226,6 +227,7 @@ export async function getSessionMessages(sessionId: string, lastRetrievalTime?: 
         }
 
         const snapshot = await getDocs(messagesQuery);
+        console.log(`snapshot Getting session messages for ${sessionId} lastRetrievalTime: ${lastRetrievalTime}`);
         const messages: MessageType[] = [];
         let totalPayloadSize = 0;
         const maxResultSize = MAX_PAYLOAD_SIZE;
@@ -265,6 +267,7 @@ export async function getSessionMessages(sessionId: string, lastRetrievalTime?: 
                 break;
             }
         }
+        console.log(`getsessionmessages returning ${messages.length} messages with total size ${totalPayloadSize} bytes`);
         return messages;
     } catch (error) {
         console.error(`Error getting session messages for ${sessionId}:`, error);
