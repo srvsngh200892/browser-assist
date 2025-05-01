@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY ui/package.json ui/package-lock.json ./
+COPY .env ./
 RUN npm ci
 
 # Copy UI source code

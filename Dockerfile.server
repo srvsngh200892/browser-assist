@@ -9,6 +9,7 @@ COPY server/package*.json ./
 # Install dependencies
 RUN npm install
 
+COPY .env ./
 # Copy project files
 COPY server ./
 
