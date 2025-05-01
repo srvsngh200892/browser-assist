@@ -170,6 +170,7 @@ export async function storeMessage(sessionId: string, message: MessageType) {
 
         // Check if message needs chunking
         if (needsChunking(message)) {
+            console.log(`Chunking message ${messageId}`);
             return await storeChunkedMessage(sessionId, message, messageId);
         }
 
