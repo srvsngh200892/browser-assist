@@ -51,8 +51,8 @@ export // Function to process responses asynchronously
                 // Find the first user message index
                 const firstUserIndex = messages.findIndex(m => m.role === 'user');
                 if (firstUserIndex === -1) {
-                    console.warn('No user message found in conversation');
-                    return;
+                    console.warn('No user message found in conversation', JSON.stringify(messages, null, 2));
+                    throw new Error('No user message found in conversation');
                 }
 
                 const initialMessages = messages.slice(0, firstUserIndex + 1);
