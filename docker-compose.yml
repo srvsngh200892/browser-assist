@@ -34,7 +34,7 @@ services:
     ports:
       - "3001:3001"
     env_file:
-      - ./server/src/.env
+      - ./.env
     environment:
       - FIREBASE_EMULATOR_HOST=browser-assist-firebase
       - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/sse
