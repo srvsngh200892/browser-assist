@@ -173,9 +173,11 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
                 error: "Invalid message format"
             });
         }
-
+        // to be removed after finding root cause
+        console.log('Received user message:', JSON.stringify(userMessage, null, 2));
         // Validate and add user message
         await messageHandler.addMessage(userMessage);
+        console.log('Received user message:', JSON.stringify(await messageHandler.getMessages(), null, 2));
 
         // We'll continue processing asynchronously
         res.json({
