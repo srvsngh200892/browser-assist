@@ -85,11 +85,7 @@ export async function validateUser(email: string, password: string) {
         } catch (compareError) {
             console.error("Error with bcrypt.compare:", compareError);
 
-            // Fallback for development - compare directly (only if using plaintext fallback)
-            if (password === user.password) {
-                console.warn("WARNING: Using plaintext password comparison - NOT SECURE!");
-                isMatch = true;
-            }
+            throw compareError;
         }
 
         if (!isMatch) {
