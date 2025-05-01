@@ -49,19 +49,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Configure Firestore with performance settings
-const cacheSizeBytes = FIRESTORE_CACHE_SIZE_MB * 1024 * 1024;
-const firestoreSettings = {
-    ignoreUndefinedProperties: true,
-    experimentalAutoDetectLongPolling: true,
-    maxConcurrentLimboResolutions: FIRESTORE_MAX_CONCURRENT_CONNECTIONS,
-    localCache: FIRESTORE_PERSISTENCE
-        ? persistentLocalCache({ cacheSizeBytes })
-        : memoryLocalCache()
-};
 
-// Initialize Firestore with custom settings
-const db = initializeFirestore(app, firestoreSettings);
+
+// get Firestore
+const db = getFirestore();
 
 // Connect to Firebase emulator if enabled
 if (USE_FIREBASE_EMULATOR) {
