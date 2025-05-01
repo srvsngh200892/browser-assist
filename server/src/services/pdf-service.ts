@@ -64,6 +64,16 @@ async function fetchImageAsBuffer(url: string): Promise<Buffer> {
     return Buffer.from(response.data);
 }
 
+async function getSignedUrl(file: any) {
+    // Simulate a signed URL for local testing
+    if (process.env.USE_FIREBASE_EMULATOR === 'true') {
+        const encodedPath = encodeURIComponent(file.name);
+        const url = `http://${process.env.FIREBASE_EMULATOR_HOST}:${process.env.FIREBASE_STORAGE_EMULATOR_PORT}/v0/b/${process.env.FIREBASE_STORAGE_BUCKET}/o/${encodedPath}?alt=media`;
+        return [url];
+    }
+    return await file.getSignedUrl({ action: 'read', expires: '03-01-2500' });
+}
+
 /**
  * Fetch all messages for a session
  */
@@ -93,7 +103,7 @@ async function fetchSessionScreenshots(sessionId: string) {
         const screenshots = [];
         for (const file of files) {
             try {
-                const url = await file.getSignedUrl({ action: 'read', expires: '03-01-2500' });
+                const url = await getSignedUrl(file);
                 const filename = file.name;
                 const timestamp = parseInt(path.basename(filename).split('.')[0], 10) || Date.now();
                 screenshots.push({
@@ -375,11 +385,8 @@ async function storePdfInStorage(sessionId: string, pdfFilePath: string): Promis
             contentType: 'application/pdf',
             resumable: false
         });
-        const [downloadUrl] = await file.getSignedUrl({
-            action: 'read',
-            expires: '03-01-2500'
-        });
-        return downloadUrl;
+        const url = await getSignedUrl(file);
+        return url[0];
     } catch (error) {
         console.error('Error uploading PDF to storage:', error);
         throw error;
