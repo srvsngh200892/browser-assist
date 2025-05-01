@@ -39,8 +39,6 @@ router.post('/session', authMiddleware, async (req: any, res: Response) => {
         };
 
         await createFirebaseSession(sessionId, user.userId, metadata);
-        console.log(`Created new session: ${sessionId} for user: ${user.userId}`);
-
         return res.status(201).json({
             success: true,
             sessionId,
@@ -55,19 +53,15 @@ router.post('/session', authMiddleware, async (req: any, res: Response) => {
     }
 });
 
-/**
- * Get active session count
- */
-router.get('/sessions/count', authMiddleware, (req: Request, res: Response) => {
-    const count = sessionStore.getActiveSessionCount();
-    return res.json({
-        success: true,
-        count
-    });
-});
-
-router.get("/session/:sessionId", authMiddleware, async (req: Request, res: Response) => {
+router.get("/session/:sessionId", authMiddleware, async (req: any, res: Response) => {
     try {
+        const user = req.user;
+        if (!user || !user.userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'Authentication required'
+            });
+        }
         const { sessionId } = req.params;
         if (!sessionId) {
             return res.status(400).json({
@@ -82,6 +76,14 @@ router.get("/session/:sessionId", authMiddleware, async (req: Request, res: Resp
             return res.status(404).json({
                 success: false,
                 error: "Session not found"
+            });
+        }
+
+        // Verify ownership
+        if (sessionData.userId !== user.userId) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to access this session'
             });
         }
 
@@ -101,17 +103,6 @@ router.get("/session/:sessionId", authMiddleware, async (req: Request, res: Resp
             error: "Failed to get session info"
         });
     }
-});
-
-/**
- * Get all session IDs for the authenticated user
- */
-router.get('/sessions', authMiddleware, (req: any, res: Response) => {
-    const sessionIds = sessionStore.getAllSessionIds();
-    return res.json({
-        success: true,
-        sessions: sessionIds
-    });
 });
 
 export default router; 
