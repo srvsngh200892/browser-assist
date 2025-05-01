@@ -107,14 +107,8 @@ async function getOrCreateMessageHandler(sessionId: string): Promise<MessageHand
                 await messageHandler.loadMessages(false);
             }
         } else {
-            // No session found in Firebase or memory
-            console.log(`Session ${sessionId} not found in Firebase, creating new message handler`);
-            messageHandler = new MessageHandler(sessionId);
-            sessionStore.setMessageHandler(sessionId, messageHandler);
+            throw new Error(`Session ${sessionId} not found in Firebase`);
         }
-    } else {
-        // Session exists in memory, update activity in Firebase
-        await updateSessionActivity(sessionId);
     }
 
     return messageHandler;

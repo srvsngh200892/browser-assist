@@ -141,6 +141,14 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
 
 // Handle chat messages
 router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    // Get user information from the authentication middleware
+    const user = req.user;
+    if (!user || !user.userId) {
+        return res.status(401).json({
+            success: false,
+            error: "Authentication required"
+        });
+    }
     const { sessionId } = req.params;
     if (!sessionId) {
         return res.status(400).json({
@@ -156,6 +164,12 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
             return res.status(404).json({
                 success: false,
                 error: "Session not found"
+            });
+        }
+        if (sessionData.userId !== user.userId) {
+            return res.status(403).json({
+                success: false,
+                error: "You do not have permission to access this session"
             });
         }
 
@@ -174,10 +188,10 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
             });
         }
         // to be removed after finding root cause
-        console.log('Received user message:', JSON.stringify(userMessage, null, 2));
+        console.log('Received user message:', sessionId, JSON.stringify(userMessage, null, 2));
         // Validate and add user message
         await messageHandler.addMessage(userMessage);
-        console.log('Received user message:', JSON.stringify(await messageHandler.getMessages(), null, 2));
+        console.log('Received user message after adding:', sessionId, JSON.stringify(await messageHandler.getMessages(), null, 2));
 
         // We'll continue processing asynchronously
         res.json({
