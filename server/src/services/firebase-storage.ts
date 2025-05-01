@@ -1,25 +1,27 @@
-import { getStorage, ref, uploadString, getDownloadURL, connectStorageEmulator } from "firebase/storage";
-import { app } from "./firebase-messages"; // Reuse existing Firebase app
+import admin from 'firebase-admin';
 import sharp from 'sharp';
-import { USE_FIREBASE_EMULATOR, FIREBASE_EMULATOR_HOST, FIREBASE_STORAGE_EMULATOR_PORT } from "./env";
 import phash from 'sharp-phash';
+import { USE_FIREBASE_EMULATOR, FIREBASE_EMULATOR_HOST, FIREBASE_STORAGE_EMULATOR_PORT } from "./env";
 
-const storage = getStorage(app);
-
-// Connect to Firebase Storage emulator if enabled
-if (USE_FIREBASE_EMULATOR) {
-    console.log(`Connecting to Firebase Storage emulator at ${FIREBASE_EMULATOR_HOST}:${FIREBASE_STORAGE_EMULATOR_PORT}`);
-    connectStorageEmulator(storage, FIREBASE_EMULATOR_HOST, FIREBASE_STORAGE_EMULATOR_PORT);
+// Initialize Firebase Admin if not already initialized
+console.log(`Initializing Firebase Admin with storage bucket ${process.env.FIREBASE_STORAGE_BUCKET}`);
+if (!admin.apps.length) {
+    admin.initializeApp({
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // Ensure this is set
+    });
 }
 
-const SCREENSHOTS_FOLDER = "screenshots";
+if (USE_FIREBASE_EMULATOR) {
+    const host = `http://${FIREBASE_EMULATOR_HOST}:${FIREBASE_STORAGE_EMULATOR_PORT}`;
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${FIREBASE_EMULATOR_HOST}:${FIREBASE_STORAGE_EMULATOR_PORT}`;
+    console.log(`Using Firebase Storage emulator at ${host}`);
+}
 
-// Helper to generate a unique screenshot filename
+const bucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET);
+
 const getScreenshotPath = (sessionId: string, timestamp: number) => {
-    // Format: sessions/{sessionId}/screenshots/{timestamp}.webp
     return `validations/${sessionId}/screenshots/${timestamp}.png`;
 };
-
 
 async function isScreenshotBlankOrWithLoading(imageBuffer: Buffer, tolerancePercent = 0.5) {
     const { data, info } = await sharp(imageBuffer)
@@ -27,7 +29,7 @@ async function isScreenshotBlankOrWithLoading(imageBuffer: Buffer, tolerancePerc
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-    const [r0, g0, b0, a0] = data.slice(0, 4); // First pixel
+    const [r0, g0, b0, a0] = data.slice(0, 4);
     let diffCount = 0;
     const totalPixels = info.width * info.height;
 
@@ -43,173 +45,125 @@ async function isScreenshotBlankOrWithLoading(imageBuffer: Buffer, tolerancePerc
     return diffPercent <= tolerancePercent;
 }
 
-// Helper to compress image before storage
 async function compressScreenshot(base64Image: string): Promise<{ compressedImage: string, imageBuffer: Buffer }> {
+    if (!base64Image || typeof base64Image !== 'string') {
+        throw new Error('Invalid base64 image provided');
+    }
+
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+
+    if (!base64Data || base64Data.trim() === '') {
+        throw new Error('Empty image data after removing data URL prefix');
+    }
+
+    let imageBuffer: Buffer;
+
     try {
-        // Check if input is valid
-        if (!base64Image || typeof base64Image !== 'string') {
-            throw new Error('Invalid base64 image provided');
-        }
+        imageBuffer = Buffer.from(base64Data, 'base64');
 
-        // Remove data URL prefix if present
-        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-
-        // Validate that we have actual base64 data
-        if (!base64Data || base64Data.trim() === '') {
-            throw new Error('Empty image data after removing data URL prefix');
-        }
-
-        let imageBuffer: Buffer;
-
-        try {
-            imageBuffer = Buffer.from(base64Data, 'base64');
-
-            // Check if buffer is valid
-            if (!imageBuffer || imageBuffer.length === 0) {
-                throw new Error('Failed to create buffer from base64 data');
-            }
-
-        } catch (error) {
-            console.error('Buffer creation error:', error);
-            throw new Error(`Failed to create buffer from image data: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-
-        // Compress and convert to png
-        try {
-            const compressedBuffer = await sharp(imageBuffer)
-                .resize(1024, 768, { // Reduce dimensions
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
-                .png({ // Convert to png with compression
-                    quality: 80,
-                    effort: 6
-                })
-                .toBuffer();
-
-            return {
-                compressedImage: compressedBuffer.toString('base64'),
-                imageBuffer: compressedBuffer
-            };
-        } catch (error) {
-            console.error('Sharp processing error:', error);
-            throw new Error(`Image compression failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        if (!imageBuffer || imageBuffer.length === 0) {
+            throw new Error('Failed to create buffer from base64 data');
         }
     } catch (error) {
-        console.error('compressScreenshot error:', error);
-        throw error; // Propagate the error to be handled by the caller
+        throw new Error(`Failed to create buffer from image data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    try {
+        const compressedBuffer = await sharp(imageBuffer)
+            .resize(1024, 768, {
+                fit: 'inside',
+                withoutEnlargement: true
+            })
+            .png({
+                quality: 80,
+                effort: 6
+            })
+            .toBuffer();
+
+        return {
+            compressedImage: compressedBuffer.toString('base64'),
+            imageBuffer: compressedBuffer
+        };
+    } catch (error) {
+        throw new Error(`Image compression failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
-// Calculate image similarity based on perceptual hash
 async function calculatePerceptualSimilarity(imageBuffer: Buffer, lastHash?: string): Promise<{ similarity: number, hash: string }> {
     try {
-        // Generate perceptual hash for current image
         const currentHash = await phash(imageBuffer);
 
-        // If we don't have a previous hash, return zero similarity
         if (!lastHash || !lastHash.trim()) {
             return { similarity: 0, hash: currentHash };
         }
 
-        // Calculate Hamming distance between hashes
         const distance = hammingDistance(lastHash, currentHash);
-
-        // Convert distance to similarity percentage (64 is max distance for pHash)
-        // Lower distance means higher similarity
         const similarity = 100 - ((distance / 64) * 100);
 
         return { similarity, hash: currentHash };
     } catch (error) {
         console.error('Error calculating perceptual similarity:', error);
-        // Return a default hash and zero similarity on error
         return { similarity: 0, hash: '' };
     }
 }
 
-// Store screenshot with deduplication
 export async function storeScreenshot(
     sessionId: string,
     base64Image: string,
     lastPerceptualHash?: string,
-    similarityThreshold: number = 80, // Increased default threshold for stricter matching
-    blankImageThreshold: number = 0.50 // Default threshold for blank image detection
+    similarityThreshold: number = 80,
+    blankImageThreshold: number = 0.50
 ): Promise<{
     url: string;
     hash: string;
     timestamp: number;
-    path: string; // Added path to response
+    path: string;
     similarity?: number;
 } | null> {
     try {
-        // Validate input
         if (!base64Image || typeof base64Image !== 'string') {
             console.error('Invalid image data provided');
             return null;
         }
 
-        // Compress image first
-        let compressResult;
-        try {
-            compressResult = await compressScreenshot(base64Image);
-        } catch (compressionError) {
-            console.error('Error compressing screenshot:', compressionError);
-            return null;
-        }
+        const compressResult = await compressScreenshot(base64Image);
 
-        // Check if image is blank or has loading
         const isBlank = await isScreenshotBlankOrWithLoading(compressResult.imageBuffer, blankImageThreshold);
-        if (isBlank) {
-            return null;
-        }
+        if (isBlank) return null;
 
-        // Calculate perceptual similarity
-        const { similarity, hash } = await calculatePerceptualSimilarity(
-            compressResult.imageBuffer,
-            lastPerceptualHash
-        );
+        const { similarity, hash } = await calculatePerceptualSimilarity(compressResult.imageBuffer, lastPerceptualHash);
+        if (similarity >= similarityThreshold) return null;
 
-
-        // Skip if image hasn't changed significantly based on threshold
-        if (similarity >= similarityThreshold) {
-            return null;
-        }
-
-        // Attempt to upload the image
         const timestamp = Date.now();
         const path = getScreenshotPath(sessionId, timestamp);
-        const storageRef = ref(storage, path);
+        const file = bucket.file(path);
+        const buffer = Buffer.from(compressResult.compressedImage, 'base64');
 
-        try {
-            // Upload the compressed image
-            await uploadString(storageRef, compressResult.compressedImage, 'base64');
-            const url = await getDownloadURL(storageRef);
+        await file.save(buffer, {
+            contentType: 'image/png',
+            public: true,
+            metadata: { cacheControl: 'public,max-age=31536000' }
+        });
 
-            // Update screenshot count in session metadata
-            await updateScreenshotCount(sessionId);
+        const url = `https://storage.googleapis.com/${bucket.name}/${path}`;
 
-            return {
-                url,
-                hash,
-                timestamp,
-                path,
-                similarity
-            };
-        } catch (uploadError) {
-            console.error('Failed to upload screenshot:', uploadError);
-            return null;
-        }
+        await updateScreenshotCount(sessionId);
+
+        return {
+            url,
+            hash,
+            timestamp,
+            path,
+            similarity
+        };
     } catch (error) {
         console.error('Error storing screenshot:', error);
         return null;
     }
 }
 
-// Helper function to calculate Hamming distance between two hashes
 function hammingDistance(hash1: string, hash2: string): number {
-    if (!hash1 || !hash2 || hash1.length !== hash2.length) {
-        return 64; // Maximum distance for 64-bit hash
-    }
+    if (!hash1 || !hash2 || hash1.length !== hash2.length) return 64;
 
     let distance = 0;
     for (let i = 0; i < hash1.length; i++) {
@@ -220,24 +174,18 @@ function hammingDistance(hash1: string, hash2: string): number {
     return distance;
 }
 
-// Helper function to update screenshot count in session metadata
 async function updateScreenshotCount(sessionId: string): Promise<void> {
     try {
-        // Import the required function from firebase-sessions
         const { updateSessionMetadata, getSessionMetadata } = await import('./firebase-sessions');
-
-        // Get current session metadata
         const sessionData = await getSessionMetadata(sessionId);
         if (!sessionData) {
             console.error(`Cannot update screenshot count for non-existent session: ${sessionId}`);
             return;
         }
 
-        // Calculate new screenshot count
         const currentCount = sessionData.metadata?.screenshotCount || 0;
         const newCount = currentCount + 1;
 
-        // Update session metadata with new screenshot count
         await updateSessionMetadata(sessionId, {
             metadata: {
                 ...(sessionData.metadata || {}),
@@ -248,4 +196,4 @@ async function updateScreenshotCount(sessionId: string): Promise<void> {
     } catch (error) {
         console.error(`Error updating screenshot count for session ${sessionId}:`, error);
     }
-} 
+}
