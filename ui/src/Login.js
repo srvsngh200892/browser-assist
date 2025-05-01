@@ -180,7 +180,7 @@ function Login({ onLoginSuccess }) {
                 localStorage.setItem('user', JSON.stringify(response.data.user));
 
                 // Store session ID if available (for login)
-                if (isLogin && response.data.sessionId) {
+                if (response.data.sessionId) {
                     localStorage.setItem('session_id', response.data.sessionId);
                     console.log('Session created with ID:', response.data.sessionId);
                 }

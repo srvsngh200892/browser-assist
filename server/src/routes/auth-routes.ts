@@ -120,9 +120,19 @@ router.post("/auth/register", async (req: Request, res: Response) => {
             username
         });
 
+        const sessionId = uuid();
+        const sessionMetadata = {
+            userAgent: req.headers['user-agent'] || "unknown",
+            ip: req.ip || "unknown"
+        };
+
+        await createSession(sessionId, userId, sessionMetadata);
+
+
         return res.status(201).json({
             success: true,
             token,
+            sessionId,
             user: { userId, username, email }
         });
     } catch (error) {
