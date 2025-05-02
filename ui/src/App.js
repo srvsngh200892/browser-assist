@@ -1296,6 +1296,8 @@ function App() {
             }
         }
 
+        // Set loading state immediately to ensure polling starts
+        setLoading(true);
         loadingRef.current = true;
 
         // Reset streaming content
@@ -1346,6 +1348,9 @@ function App() {
             pollTimerRef.current = null;
         }
 
+        // Start polling now with zero delay
+        pollTimerRef.current = setTimeout(pollForMessages, 0);
+
         try {
             // Check session and create if needed
             if (!sessionId) {
@@ -1363,8 +1368,6 @@ function App() {
             await axios.post(`${SERVER_URL}/api/chat/${sessionId}`, {
                 userMessage
             });
-            // Set loading state immediately to ensure polling starts
-            setLoading(true);
             console.log('SEND: Message sent successfully');
 
             // Ensure loading state is still true after API call

@@ -87,8 +87,7 @@ class MessageHandler {
 
     public async getMessages(forceReload: boolean = false): Promise<MessageType[]> {
         if (forceReload) {
-            this.messages = await getSessionMessages(this.sessionId);
-            this.hasLoaded = true;
+            return await getSessionMessages(this.sessionId);
         }
         return this.messages;
     }
