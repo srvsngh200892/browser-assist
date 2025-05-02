@@ -9,6 +9,7 @@ import {
     storeMessages,
     getSessionMessages,
     getLastAssistantMessage,
+    sessionHasMessages,
 } from "./firebase-messages";
 import { updateSessionActivity } from "./firebase-sessions";
 
@@ -40,8 +41,14 @@ class MessageHandler {
 
     /** Factory method that ensures full initialization */
     public static async create(sessionId: string): Promise<MessageHandler> {
+        console.log(`Creating MessageHandler for session ${sessionId}`);
         const handler = new MessageHandler(sessionId);
         await handler.storeMessages(); // This will throw if it fails
+        const hasMessages = await sessionHasMessages(sessionId);
+        if (hasMessages) {
+            console.log(`Session ${sessionId} has messages, loading them`);
+            await handler.loadMessages(false);
+        }
         return handler;
     }
 
@@ -49,13 +56,14 @@ class MessageHandler {
         if (this.hasLoaded) return this.messages;
 
         const messages = await getSessionMessages(this.sessionId);
-        if (!messages || messages.length === 0) {
-            return [initialMessageSystemPrompt];
-        }
 
-        this.messages = addPerformNextStep
-            ? [...messages, performNextStepSystemPrompt]
-            : messages;
+        if (!messages || messages.length === 0) {
+            this.messages = [initialMessageSystemPrompt];
+        } else {
+            this.messages = addPerformNextStep
+                ? [...messages, performNextStepSystemPrompt]
+                : messages;
+        }
 
         this.hasLoaded = true;
         return this.messages;
