@@ -54,18 +54,13 @@ cd browser-assist
 2. Create a `.env` file in the root directory with the following variables:
 ```bash
 Copy the .env.example file to .env and update the variables
-``
+```
 
 ### Running with Docker
 
-1. Start all services:
 ```bash
-docker-compose up -d
-```
-
-2. View logs:
-```bash
-docker-compose logs -f
+./deploy.sh build
+./deploy.sh dev
 ```
 
 3. Access the application:
@@ -73,14 +68,6 @@ docker-compose logs -f
    - Server API: http://localhost:3001
    - Firebase Emulator: http://localhost:8080
    - MCP Server: http://localhost:3003
-
-### Development via Docket
-
-```bash
-./deploy.sh build
-./deploy.sh dev
-```
-
 
 
 ## API Endpoints
