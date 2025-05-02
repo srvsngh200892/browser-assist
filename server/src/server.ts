@@ -9,23 +9,6 @@ import {
     HOST
 } from './config/env';
 
-// Import message handler
-import { MessageHandler } from './services/messages';
-
-// Import session store
-import sessionStore from './services/session-store';
-
-// Import Firebase services
-import {
-    sessionHasMessages
-} from './services/firebase-messages';
-
-import {
-    createSession as createFirebaseSession,
-    sessionExists,
-    updateSessionActivity
-} from './services/firebase-sessions';
-
 // Initialize express app
 const app = express();
 
@@ -83,37 +66,6 @@ app.use(async (req, res, next) => {
 // This will be initialized in the init endpoint
 let openAiTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
 
-// Get or create a message handler for a session
-async function getOrCreateMessageHandler(sessionId: string): Promise<MessageHandler> {
-    let messageHandler = sessionStore.getMessageHandler(sessionId);
-
-    if (!messageHandler) {
-        // Check if the session exists in Firebase
-        const exists = await sessionExists(sessionId);
-
-        if (exists) {
-            // Session exists in Firebase but not in memory - restore it
-            console.log(`Restoring existing session from Firebase: ${sessionId}`);
-            messageHandler = new MessageHandler(sessionId);
-            sessionStore.setMessageHandler(sessionId, messageHandler);
-
-            // Update session activity
-            await updateSessionActivity(sessionId);
-
-            // Load messages
-            const hasExistingMessages = await sessionHasMessages(sessionId);
-            if (hasExistingMessages) {
-                console.log(`Found existing messages for session: ${sessionId}, loading them`);
-                await messageHandler.loadMessages(false);
-            }
-        } else {
-            throw new Error(`Session ${sessionId} not found in Firebase`);
-        }
-    }
-
-    return messageHandler;
-}
-
 // Import all routes
 import sessionRoutes from './routes/session-routes';
 import messageRoutes from './routes/message-routes';
@@ -147,7 +99,7 @@ app.get("/api/ping", (_req, res) => {
 });
 
 // Export for external use (e.g., in tests)
-export { app, openaiClient, openAiTools, getOrCreateMessageHandler };
+export { app, openaiClient, openAiTools };
 
 // Start the server if this file is run directly
 if (require.main === module) {

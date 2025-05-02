@@ -1,13 +1,28 @@
 # Browser Assist
+This AI-powered automation platform allows users to control and observe browser interactions in real-time using natural language prompts. By combining OpenAI's language capabilities with mcp-playwright, the system interprets user instructions and performs corresponding actions in the browser, with live visual feedback.
 
-Browser Assist is an intelligent browser automation companion that provides AI-powered assistance for web browsing tasks. It uses OpenAI's models and Firebase for data persistence, all running in a containerized environment with Docker.
+Designed to eliminate the need for manual scripting, the application streamlines a variety of tasks, including:
+
+Automated Manual Testing: QA engineers can describe test cases in plain English (e.g., “Log into the app and verify the dashboard loads”), and the system runs the test in real-time, reducing time spent on repetitive test setups.
+
+UI Walkthroughs and Demos: Product teams can generate guided product tours or feature walkthroughs by simply describing the steps, making it easy to showcase workflows.
+
+Web Data Exploration: Users can instruct the agent to navigate websites, extract specific data, or simulate user flows for research or scraping purposes.
+
+Regression Checks: Developers can validate UI behavior across multiple changes by describing previously known flows and having the AI replay them on-demand.
+
+Training and Onboarding: New team members can learn product functionality by watching live, prompt-driven interactions rather than reading documentation or watching static videos.
+
+With natural language as the interface, this tool makes browser automation accessible to both technical and non-technical users.
 
 ## Features
 
 - Real-time browser streaming with screenshots
 - AI-powered assistance using OpenAI models
+- Generates PDF reports of the test results with conversation histoy
+- MCP (Model Context Protocol) Playwright by Microsoft for browser automation
 - Firebase integration for data persistence
-- User authentication and session management
+- User authentication and session management using JWT
 - Docker-based deployment for easy setup
 
 ## Architecture
@@ -37,41 +52,15 @@ cd browser-assist
 ```
 
 2. Create a `.env` file in the root directory with the following variables:
-```
-# Server Configuration
-PORT=3001
-HOST=0.0.0.0
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
-DEBUG=true
-
-# Firebase Configuration
-FIREBASE_API_KEY=your_firebase_api_key
-FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-FIREBASE_PROJECT_ID=your_firebase_project_id
-FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
-FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
-FIREBASE_APP_ID=your_firebase_app_id
-
-# Firebase Emulator (for development)
-USE_FIREBASE_EMULATOR=true
-FIREBASE_EMULATOR_HOST=firebase
-FIREBASE_EMULATOR_PORT=8080
-
-# MCP Configuration
-MCP_SERVER_URL=http://localhost:3003/sse
+```bash
+Copy the .env.example file to .env and update the variables
 ```
 
 ### Running with Docker
 
-1. Start all services:
 ```bash
-docker-compose up -d
-```
-
-2. View logs:
-```bash
-docker-compose logs -f
+./deploy.sh build
+./deploy.sh dev
 ```
 
 3. Access the application:
@@ -80,27 +69,6 @@ docker-compose logs -f
    - Firebase Emulator: http://localhost:8080
    - MCP Server: http://localhost:3003
 
-### Development
-
-#### UI Development
-
-The UI is a React application with proxy configuration for API requests:
-
-```bash
-cd ui
-npm install
-npm start
-```
-
-#### Server Development
-
-The server is a TypeScript Express application:
-
-```bash
-cd server
-npm install
-npm run dev
-```
 
 ## API Endpoints
 
@@ -121,22 +89,6 @@ npm run dev
 - `GET /api/browser-stream/:sessionId`: Get real-time browser screenshots
 - `POST /api/stream-control`: Control streaming (pause/resume)
 - `POST /api/stream-disconnect`: Disconnect from a stream
-
-## Troubleshooting
-
-### CORS Issues
-
-If you encounter CORS issues, check:
-1. The server's CORS configuration in `server/src/server.ts`
-2. The proxy configuration in `ui/src/setupProxy.js`
-3. Ensure proper headers for SSE connections
-
-### Docker Network Issues
-
-If containers can't communicate:
-1. Check the Docker network configuration in `docker-compose.yml`
-2. Ensure environment variables are properly set for each service
-3. Restart the Docker containers with `docker-compose down && docker-compose up -d`
 
 ## License
 
