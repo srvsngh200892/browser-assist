@@ -144,35 +144,6 @@ class MessageHandler {
     public getSessionId() {
         return this.sessionId;
     }
-
-    public async resetToInitialWithLastAssistantMessage(): Promise<void> {
-        try {
-
-            // Instead of loading all messages, we'll directly query for the last assistant message
-            const lastAssistantMessage = await getLastAssistantMessage(this.sessionId);
-
-            // Set messages to initial prompt and last assistant message (if found)
-            if (lastAssistantMessage) {
-                this.messages = [initialMessageSystemPrompt, lastAssistantMessage];
-            } else {
-                this.messages = [initialMessageSystemPrompt];
-            }
-
-            // Store the changes to Firebase too
-            await this.storeMessages();
-        } catch (error) {
-            console.error(`[${this.sessionId}] Error resetting messages:`, error);
-            // Fallback to just the initial prompt
-            this.messages = [initialMessageSystemPrompt];
-        }
-
-        // Try to store the fallback messages
-        try {
-            await this.storeMessages();
-        } catch (storeError) {
-            console.error(`[${this.sessionId}] Error storing fallback messages:`, storeError);
-        }
-    }
 }
 
 

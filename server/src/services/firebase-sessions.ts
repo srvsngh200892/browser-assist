@@ -1,65 +1,58 @@
-import {
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    query,
-    setDoc,
-    where,
-    orderBy,
-    serverTimestamp,
-    deleteDoc,
-    writeBatch
-} from "firebase/firestore";
-import { db } from "./firebase-messages";
 
-// Collection references
+import { getFirestore, FieldValue, WriteBatch } from "firebase-admin/firestore";
+import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
+
+// Initialize Firebase Admin if not already initialized
+if (!getFirestore.length) {
+    initializeApp({
+        credential: applicationDefault(), // or use cert({...}) if needed
+    });
+}
+
+
+const db = getFirestore();
+
 const SESSIONS_COLLECTION = "sessions";
 
-
-// Session metadata interface
 export interface SessionMetadata {
     sessionId: string;
     userId: string;
-    createdAt: any; // Firebase Timestamp
-    lastActive: any; // Firebase Timestamp
+    createdAt: FirebaseFirestore.Timestamp;
+    lastActive: FirebaseFirestore.Timestamp;
     status: 'active' | 'inactive' | 'expired';
-    metadata?: Record<string, any>; // Optional additional metadata
+    metadata?: Record<string, any>;
 }
 
-// Stream state interface for session streaming status
 export interface StreamState {
     sessionId: string;
     active: boolean;
-    streamId?: string;     // Unique ID for each stream to prevent stream hijacking
-    pauseReason?: string;  // Can be empty string or undefined
+    streamId?: string;
+    pauseReason?: string;
     pausedAt?: number;
     resumedAt?: number;
-    lastScreenshotAt?: number; // Added to track last screenshot time
-    lastPerceptualHash?: string; // Perceptual hash of the last screenshot
-    similarityThreshold?: number; // Threshold percentage for image similarity (0-100)
-    minScreenshotInterval?: number; // Minimum time between screenshots in milliseconds
-    blankImageThreshold?: number; // Threshold for blank image detection (0-1), higher = more strict
+    lastScreenshotAt?: number;
+    lastPerceptualHash?: string;
+    similarityThreshold?: number;
+    minScreenshotInterval?: number;
+    blankImageThreshold?: number;
 }
 
-// Create a new session in Firebase
 export async function createSession(
     sessionId: string,
     userId: string,
     metadata?: Record<string, any>
 ): Promise<string | null> {
     try {
-        const sessionsRef = collection(db, SESSIONS_COLLECTION);
         const sessionData: SessionMetadata = {
             sessionId,
             userId,
-            createdAt: serverTimestamp(),
-            lastActive: serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp() as any,
+            lastActive: FieldValue.serverTimestamp() as any,
             status: 'active',
-            metadata
+            metadata,
         };
 
-        await setDoc(doc(sessionsRef, sessionId), sessionData);
+        await db.collection(SESSIONS_COLLECTION).doc(sessionId).set(sessionData);
         return sessionId;
     } catch (error) {
         console.error("Error creating session:", error);
@@ -67,257 +60,174 @@ export async function createSession(
     }
 }
 
-// Get session metadata from Firebase
 export async function getSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
     try {
-        const sessionDoc = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId));
-
-        if (sessionDoc.exists()) {
-            return sessionDoc.data() as SessionMetadata;
-        }
-
-        return null;
+        const docSnap = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
+        return docSnap.exists ? (docSnap.data() as SessionMetadata) : null;
     } catch (error) {
-        console.error(`Error getting session metadata for ${sessionId}:`, error);
+        console.error("Error getting session metadata:", error);
         return null;
     }
 }
 
-// Update session metadata (e.g., lastActive timestamp)
 export async function updateSessionMetadata(
     sessionId: string,
     updates: Partial<Omit<SessionMetadata, 'sessionId' | 'createdAt'>>
 ): Promise<boolean> {
     try {
-        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
-        const sessionDoc = await getDoc(sessionRef);
+        const sessionRef = db.collection(SESSIONS_COLLECTION).doc(sessionId);
+        const sessionDoc = await sessionRef.get();
 
-        if (!sessionDoc.exists()) {
-            return false;
-        }
+        if (!sessionDoc.exists) return false;
 
-        // Get existing session data
-        const existingData = sessionDoc.data();
+        await sessionRef.set(
+            {
+                ...updates,
+                sessionId,
+                lastActive: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+        );
 
-        // Combine existing data with updates, ensuring we preserve all fields
-        const updatedData: Partial<SessionMetadata> = {
-            ...existingData,
-            ...updates,
-            sessionId, // Ensure sessionId is preserved
-            lastActive: serverTimestamp()
-        };
-
-        await setDoc(sessionRef, updatedData, { merge: true });
         return true;
     } catch (error) {
-        console.error(`Error updating session metadata for ${sessionId}:`, error);
+        console.error("Error updating session metadata:", error);
         return false;
     }
 }
 
-// List active sessions
 export async function listActiveSessions(): Promise<SessionMetadata[]> {
     try {
-        const sessionsRef = collection(db, SESSIONS_COLLECTION);
-        const sessionsQuery = query(
-            sessionsRef,
-            where("status", "==", "active"),
-            orderBy("lastActive", "desc")
-        );
+        const querySnap = await db
+            .collection(SESSIONS_COLLECTION)
+            .where("status", "==", "active")
+            .orderBy("lastActive", "desc")
+            .get();
 
-        const snapshot = await getDocs(sessionsQuery);
-        const sessions: SessionMetadata[] = [];
-
-        snapshot.forEach(doc => {
-            sessions.push(doc.data() as SessionMetadata);
-        });
-
-        return sessions;
+        return querySnap.docs.map(doc => doc.data() as SessionMetadata);
     } catch (error) {
         console.error("Error listing active sessions:", error);
         return [];
     }
 }
 
-// Set session status (active, inactive, expired)
 export async function setSessionStatus(sessionId: string, status: 'active' | 'inactive' | 'expired'): Promise<boolean> {
     return updateSessionMetadata(sessionId, { status });
 }
 
-// Check if a session exists in Firebase
 export async function sessionExists(sessionId: string): Promise<boolean> {
     try {
-        const sessionDoc = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId));
-        return sessionDoc.exists();
+        const sessionDoc = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
+        return sessionDoc.exists;
     } catch (error) {
-        console.error(`Error checking if session ${sessionId} exists:`, error);
+        console.error("Error checking session existence:", error);
         return false;
     }
 }
 
-// Update session activity timestamp
 export async function updateSessionActivity(sessionId: string, isActive: boolean = true): Promise<boolean> {
-    try {
-        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
-        const sessionDoc = await getDoc(sessionRef);
-
-        if (!sessionDoc.exists()) {
-            return false;
-        }
-
-        // Get existing session data to ensure we preserve it
-        const existingData = sessionDoc.data();
-
-        // Update the lastActive field and status based on isActive parameter
-        await setDoc(sessionRef, {
-            ...existingData,
-            lastActive: serverTimestamp(),
-            status: isActive ? 'active' : 'inactive'
-        }, { merge: true });
-
-        return true;
-    } catch (error) {
-        console.error(`Error updating session activity for ${sessionId}:`, error);
-        return false;
-    }
+    return updateSessionMetadata(sessionId, {
+        status: isActive ? "active" : "inactive"
+    });
 }
 
-// Set or update the stream state for a session
 export async function setStreamState(
     sessionId: string,
     streamState: Partial<Omit<StreamState, 'sessionId'>>
 ): Promise<boolean> {
     try {
-        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
-        const sessionDoc = await getDoc(sessionRef);
+        const sessionRef = db.collection(SESSIONS_COLLECTION).doc(sessionId);
+        const docSnap = await sessionRef.get();
 
-        if (!sessionDoc.exists()) {
-            return false;
-        }
+        if (!docSnap.exists) return false;
 
-        // Get existing session data
-        const existingData = sessionDoc.data();
-        const existingStreamState = existingData.streamState || {};
-
-        // Combine existing stream state with updates
+        const existing = docSnap.data();
         const updatedStreamState = {
-            ...existingStreamState,
+            ...(existing?.streamState || {}),
             ...streamState,
-            sessionId  // Always ensure sessionId is included
+            sessionId
         };
 
-        // Update the session with the new stream state
-        await setDoc(sessionRef, {
-            ...existingData,
-            streamState: updatedStreamState,
-            lastActive: serverTimestamp()
-        }, { merge: true });
+        await sessionRef.set(
+            {
+                streamState: updatedStreamState,
+                lastActive: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+        );
 
         return true;
     } catch (error) {
-        console.error(`Error updating stream state for ${sessionId}:`, error);
+        console.error("Error setting stream state:", error);
         return false;
     }
 }
 
-// Get the current stream state for a session
 export async function getStreamState(sessionId: string): Promise<StreamState | null> {
     try {
-        const sessionDoc = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId));
+        const docSnap = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
+        const data = docSnap.data();
 
-        if (sessionDoc.exists()) {
-            const data = sessionDoc.data();
-            if (data.streamState) {
-                return data.streamState as StreamState;
-            }
-            // Default state if not explicitly set
-            return {
-                sessionId,
-                active: true
-            };
-        }
-
-        return null;
+        return docSnap.exists
+            ? (data?.streamState as StreamState) ?? { sessionId, active: true }
+            : null;
     } catch (error) {
-        console.error(`Error getting stream state for ${sessionId}:`, error);
+        console.error("Error getting stream state:", error);
         return null;
     }
 }
 
-// Clear stream state when disconnecting
 export async function clearStreamState(sessionId: string): Promise<boolean> {
     try {
-        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
-        const sessionDoc = await getDoc(sessionRef);
+        const ref = db.collection(SESSIONS_COLLECTION).doc(sessionId);
+        const docSnap = await ref.get();
 
-        if (!sessionDoc.exists()) {
-            return false;
-        }
+        if (!docSnap.exists) return false;
 
-        // Get existing session data
-        const existingData = sessionDoc.data();
-
-        // Create a new object without the streamState field
-        const { streamState, ...updatedData } = existingData;
-
-        // Update the session doc, effectively removing the streamState field
-        await setDoc(sessionRef, updatedData);
+        await ref.update({
+            streamState: FieldValue.delete(),
+        });
 
         return true;
     } catch (error) {
-        console.error(`Error clearing stream state for ${sessionId}:`, error);
+        console.error("Error clearing stream state:", error);
         return false;
     }
 }
 
-// Delete a session and all its associated data
 export async function deleteSession(sessionId: string): Promise<boolean> {
     try {
-        // Get a reference to the session document
-        const sessionRef = doc(db, SESSIONS_COLLECTION, sessionId);
-        const sessionDoc = await getDoc(sessionRef);
+        const sessionRef = db.collection(SESSIONS_COLLECTION).doc(sessionId);
+        const docSnap = await sessionRef.get();
 
-        if (!sessionDoc.exists()) {
-            return false;
-        }
+        if (!docSnap.exists) return false;
 
-        // Delete the session document
-        await deleteDoc(sessionRef);
+        await sessionRef.delete();
 
-        // Delete all messages for this session
-        const messagesCollectionRef = collection(db, "messages");
-        const messagesQuery = query(messagesCollectionRef, where("sessionId", "==", sessionId));
-        const messagesSnapshot = await getDocs(messagesQuery);
+        const messagesQuery = db.collection("messages").where("sessionId", "==", sessionId);
+        const snapshot = await messagesQuery.get();
 
-        // Count messages to be deleted
-        const messageCount = messagesSnapshot.size;
+        const MAX_BATCH_SIZE = 400;
+        let batch: WriteBatch = db.batch();
+        let count = 0;
 
-        // Create a batch for bulk deletion (Firestore limits batches to 500 operations)
-        const MAX_BATCH_SIZE = 400; // Leave some room for other operations
-        let currentBatch = writeBatch(db);
-        let operationCount = 0;
-
-        // Add delete operations to batch
-        for (const messageDoc of messagesSnapshot.docs) {
-            currentBatch.delete(messageDoc.ref);
-            operationCount++;
-
-            // If we've reached the limit, commit this batch and start a new one
-            if (operationCount >= MAX_BATCH_SIZE) {
-                await currentBatch.commit();
-                currentBatch = writeBatch(db);
-                operationCount = 0;
+        for (const doc of snapshot.docs) {
+            batch.delete(doc.ref);
+            count++;
+            if (count >= MAX_BATCH_SIZE) {
+                await batch.commit();
+                batch = db.batch();
+                count = 0;
             }
         }
 
-        // Commit any remaining operations
-        if (operationCount > 0) {
-            await currentBatch.commit();
+        if (count > 0) {
+            await batch.commit();
         }
 
         return true;
     } catch (error) {
-        console.error(`Error deleting session ${sessionId}:`, error);
+        console.error("Error deleting session:", error);
         return false;
     }
-} 
+}
