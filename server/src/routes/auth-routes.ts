@@ -54,6 +54,7 @@ router.post("/auth/login", async (req: Request, res: Response) => {
         };
 
         await createSession(sessionId, user.userId, sessionMetadata);
+        await createMessageHandler(sessionId)
 
         return res.status(200).json({
             success: true,
