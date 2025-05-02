@@ -434,12 +434,6 @@ function App() {
      * If isDone is not provided, the client falls back to using heuristics to determine completion.
      */
     const pollForMessages = useCallback(async () => {
-        console.log('POLL: Called with state:', {
-            sessionId: !!sessionId,
-            loading: loadingRef.current,
-            hasExistingTimer: !!pollTimerRef.current,
-            currentMessageCount: messagesRef.current.length
-        });
 
         // Always clear any existing timer first to prevent duplicates
         if (pollTimerRef.current) {
@@ -1351,9 +1345,6 @@ function App() {
             clearTimeout(pollTimerRef.current);
             pollTimerRef.current = null;
         }
-
-        // Start polling now with zero delay
-        pollTimerRef.current = setTimeout(pollForMessages, 0);
 
         try {
             // Check session and create if needed

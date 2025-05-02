@@ -8,7 +8,8 @@ import {
     getSessionMetadata,
     updateSessionActivity,
     clearStreamState,
-    deleteSession
+    deleteSession,
+    createMessageHandler
 } from '../services/firebase-sessions';
 import { authMiddleware } from '../middleware/auth-middleware';
 import sessionStore from '../services/session-store';
@@ -120,6 +121,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
             username
         });
 
+
         const sessionId = uuid();
         const sessionMetadata = {
             userAgent: req.headers['user-agent'] || "unknown",
@@ -127,7 +129,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
         };
 
         await createSession(sessionId, userId, sessionMetadata);
-
+        await createMessageHandler(sessionId)
 
         return res.status(201).json({
             success: true,

@@ -1,7 +1,9 @@
 
 import { getFirestore, FieldValue, WriteBatch } from "firebase-admin/firestore";
 import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
-
+import sessionStore from './session-store';
+import { MessageHandler } from './messages';
+import { sessionHasMessages } from "./firebase-messages";
 // Initialize Firebase Admin if not already initialized
 if (!getFirestore.length) {
     initializeApp({
@@ -229,5 +231,45 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
     } catch (error) {
         console.error("Error deleting session:", error);
         return false;
+    }
+}
+
+export async function createMessageHandler(sessionId: string): Promise<MessageHandler> {
+    console.log(`Creating message handler for session: ${sessionId}`);
+    let messageHandler;
+
+    // Check if the session exists in Firebase
+    const exists = await sessionExists(sessionId);
+
+    if (exists) {
+        // Session exists in Firebase but not in memory - restore it
+        console.log(`Restoring existing session from Firebase: ${sessionId}`);
+        messageHandler = await MessageHandler.create(sessionId);
+        sessionStore.setMessageHandler(sessionId, messageHandler);
+
+        // Update session activity
+        await updateSessionActivity(sessionId);
+
+        // Load messages
+        const hasExistingMessages = await sessionHasMessages(sessionId);
+        if (hasExistingMessages) {
+            console.log(`Found existing messages for session: ${sessionId}, loading them`);
+            await messageHandler.loadMessages(false);
+        }
+    } else {
+        throw new Error(`Session ${sessionId} not found in Firebase`);
+    }
+    console.log(`Message handler created: ${sessionId}`);
+
+    return messageHandler;
+}
+
+export async function getMessageHandler(sessionId: string): Promise<MessageHandler> {
+    console.log(`Getting message handler for session: ${sessionId}`);
+    let messageHandler = sessionStore.getMessageHandler(sessionId);
+    if (messageHandler) {
+        return messageHandler;
+    } else {
+        throw new Error(`No message handler found for session: ${sessionId}`);
     }
 }

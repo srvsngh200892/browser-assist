@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware.js';
-import { getSessionMetadata, updateSessionActivity } from '../services/firebase-sessions';
+import { getSessionMetadata, updateSessionActivity, getMessageHandler } from '../services/firebase-sessions';
 import { getNewMessages } from '../services/firebase-messages';
-import { getOrCreateMessageHandler } from '../server.js';
 import { processResponse } from '../services/response-processor';
 import { initialMessageSystemPrompt } from '../utils/prompts';
 
@@ -77,7 +76,7 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         await updateSessionActivity(sessionId);
 
         // Get or create the message handler for this session
-        const messageHandler = await getOrCreateMessageHandler(sessionId);
+        const messageHandler = await getMessageHandler(sessionId);
 
         // Get the last retrieval time
         const lastRetrievalTime = messageHandler.getLastRetrievalTime();
@@ -177,7 +176,7 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         await updateSessionActivity(sessionId);
 
         // Get or create message handler for this session
-        const messageHandler = await getOrCreateMessageHandler(sessionId);
+        const messageHandler = await getMessageHandler(sessionId);
 
         const { userMessage } = req.body;
 
