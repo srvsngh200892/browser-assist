@@ -117,7 +117,7 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         }
 
         // Update the last retrieval time
-        const newRetrievalTime = messageHandler.updateLastRetrievalTime();
+        const newRetrievalTime = await messageHandler.updateLastRetrievalTime();
 
         return res.json({
             success: true,

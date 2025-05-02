@@ -26,7 +26,7 @@ router.post('/session', authMiddleware, async (req: any, res: Response) => {
         }
 
         const sessionId = uuidv4();
-        const messageHandler = new MessageHandler(sessionId);
+        const messageHandler = await MessageHandler.create(sessionId);
 
         // Use the session store instead of a global variable
         sessionStore.setMessageHandler(sessionId, messageHandler);

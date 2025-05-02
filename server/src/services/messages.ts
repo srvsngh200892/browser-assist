@@ -8,144 +8,125 @@ import {
     storeMessage,
     storeMessages,
     getSessionMessages,
-    getLastAssistantMessage
+    getLastAssistantMessage,
 } from "./firebase-messages";
 import { updateSessionActivity } from "./firebase-sessions";
 
-// Define our message type to include all necessary properties
-export type MessageType = (OpenAI.Chat.Completions.ChatCompletionMessageParam | OpenAI.Chat.Completions.ChatCompletionMessage | {
-    role: 'system' | 'user' | 'assistant' | 'tool' | 'function';
-    content: string | null;
-    id?: string;
+export type MessageType = (
+    | OpenAI.Chat.Completions.ChatCompletionMessageParam
+    | OpenAI.Chat.Completions.ChatCompletionMessage
+    | {
+        role: "system" | "user" | "assistant" | "tool" | "function";
+        content: string | null;
+        id?: string;
+        tool_calls?: Array<any>;
+        finish_reason?: string;
+    }
+) & {
     tool_calls?: Array<any>;
-    finish_reason?: string;
-}) & {
-    tool_calls?: Array<any>;  // Ensure tool_calls is available on all types
 };
 
 class MessageHandler {
     private sessionId: string;
     private messages: MessageType[] = [initialMessageSystemPrompt];
     private debug: boolean;
-    private lastRetrievalTime: number = 0;
+    private lastRetrievalTime = 0;
+    private hasLoaded = false;
 
-    constructor(sessionId: string) {
+    private constructor(sessionId: string) {
         this.sessionId = sessionId;
         this.debug = DEBUG;
-        // Initialize with system prompt
-        this.storeMessages().catch(err => console.error("Failed to store initial messages:", err));
     }
 
-    public async loadMessages(
-        addPerformNextStep: boolean = true
-    ): Promise<MessageType[]> {
-        try {
-            // Load messages from Firebase
-            const messages = await getSessionMessages(this.sessionId);
+    /** Factory method that ensures full initialization */
+    public static async create(sessionId: string): Promise<MessageHandler> {
+        const handler = new MessageHandler(sessionId);
+        await handler.storeMessages(); // This will throw if it fails
+        return handler;
+    }
 
-            // If no messages found, return the default initial state
-            if (!messages || messages.length === 0) {
-                return [initialMessageSystemPrompt];
-            }
+    public async loadMessages(addPerformNextStep: boolean = true): Promise<MessageType[]> {
+        if (this.hasLoaded) return this.messages;
 
-            if (addPerformNextStep) {
-                // Add the next step prompt if requested
-                const messagesWithNextStep = [...messages, performNextStepSystemPrompt];
-                this.messages = messagesWithNextStep;
-                return messagesWithNextStep;
-            }
-
-            this.messages = messages;
-            return messages;
-        } catch (e) {
-            console.log("Error loading messages", e);
+        const messages = await getSessionMessages(this.sessionId);
+        if (!messages || messages.length === 0) {
             return [initialMessageSystemPrompt];
         }
+
+        this.messages = addPerformNextStep
+            ? [...messages, performNextStepSystemPrompt]
+            : messages;
+
+        this.hasLoaded = true;
+        return this.messages;
     }
 
-    public async addMessage(message: MessageType) {
+    public async addMessage(message: MessageType): Promise<void> {
         this.messages.push(message);
+
         if (this.debug) {
             console.log(`Added message with role: ${message.role}`);
         }
 
-        // Store the new message in Firebase
-        await storeMessage(this.sessionId, message).catch(err =>
-            console.warn(`Failed to Store the new message in Firebase: ${err}`)
-        );
-
-        // Update session activity
-        await updateSessionActivity(this.sessionId).catch(err =>
-            console.warn(`Failed to update session activity: ${err}`)
-        );
+        await storeMessage(this.sessionId, message);
+        await updateSessionActivity(this.sessionId);
     }
 
-    public async addMessages(messages: MessageType[]) {
+    public async addMessages(messages: MessageType[]): Promise<void> {
         for (const message of messages) {
             await this.addMessage(message);
         }
     }
 
-    public async storeMessages() {
-        try {
-            await storeMessages(this.sessionId, this.messages);
-
-            // Update session activity
-            await updateSessionActivity(this.sessionId).catch(err =>
-                console.warn(`Failed to update session activity: ${err}`)
-            );
-        } catch (error) {
-            console.error("Error storing messages:", error);
-        }
+    public async storeMessages(): Promise<void> {
+        await storeMessages(this.sessionId, this.messages);
+        await updateSessionActivity(this.sessionId);
     }
 
-    public async getMessages(forceReload: boolean = false) {
+    public async getMessages(forceReload: boolean = false): Promise<MessageType[]> {
         if (forceReload) {
-            // Load fresh messages from Firebase
             this.messages = await getSessionMessages(this.sessionId);
+            this.hasLoaded = true;
         }
         return this.messages;
     }
 
-    public async removeMessageAtIndex(index: number) {
+    public async removeMessageAtIndex(index: number): Promise<boolean> {
         if (index >= 0 && index < this.messages.length) {
-            // Remove message at specified index
             this.messages.splice(index, 1);
+            return true;
         }
         return false;
     }
 
-    public setMessages(messages: MessageType[], stopStore: boolean = true) {
+    public async setMessages(messages: MessageType[], stopStore: boolean = true): Promise<void> {
         this.messages = messages;
+
         if (this.debug) {
             console.log(`Set messages array with ${messages.length} messages`);
         }
-        // Store the updated messages in Firebase
+
         if (stopStore) {
-            this.storeMessages().catch(err => console.error("Failed to store updated messages:", err));
+            await this.storeMessages(); // Will throw if it fails
         }
     }
 
-    public updateLastRetrievalTime() {
+    public async updateLastRetrievalTime(): Promise<number> {
         this.lastRetrievalTime = Date.now();
 
-        // Update session activity when messages are retrieved
-        updateSessionActivity(this.sessionId).catch(err =>
-            console.warn(`Failed to update session activity: ${err}`)
-        );
+        // Passive error swallowing here; adjust if critical
+        await updateSessionActivity(this.sessionId);
 
         return this.lastRetrievalTime;
     }
 
-    public getLastRetrievalTime() {
+    public getLastRetrievalTime(): number {
         return this.lastRetrievalTime;
     }
 
-    public getSessionId() {
+    public getSessionId(): string {
         return this.sessionId;
     }
 }
 
-
 export { MessageHandler };
-

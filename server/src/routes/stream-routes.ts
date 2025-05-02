@@ -142,30 +142,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     if (!sessionId) {
         return res.status(400).send("Session ID is required");
     }
-
-    // Validate token if provided
-    let userId = null;
-
-    // First check if the session exists in memory
-    if (!sessionStore.sessionExists(sessionId)) {
-
-        // If not in memory, check if it exists in Firebase
-        const sessionData = await getSessionMetadata(sessionId);
-        if (!sessionData) {
-            return res.status(404).send("Session not found");
-        }
-
-        // If userId is provided from token, verify session belongs to that user
-        if (userId && sessionData.userId && sessionData.userId !== userId) {
-            console.error(`User ${userId} attempted to access session belonging to ${sessionData.userId}`);
-            return res.status(403).send("Unauthorized access to session");
-        }
-
-        // Session exists in Firebase but not in memory, create it
-        const messageHandler = new MessageHandler(sessionId);
-        sessionStore.setMessageHandler(sessionId, messageHandler);
-    }
-
     // Set headers for SSE
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',

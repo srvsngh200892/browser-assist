@@ -94,7 +94,7 @@ async function getOrCreateMessageHandler(sessionId: string): Promise<MessageHand
         if (exists) {
             // Session exists in Firebase but not in memory - restore it
             console.log(`Restoring existing session from Firebase: ${sessionId}`);
-            messageHandler = new MessageHandler(sessionId);
+            messageHandler = await MessageHandler.create(sessionId);
             sessionStore.setMessageHandler(sessionId, messageHandler);
 
             // Update session activity

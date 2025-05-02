@@ -53,10 +53,9 @@ const ValidationReport = ({
 
                 // If report generation is complete or failed, stop polling
                 if (response.data.status === 'completed' || response.data.status === 'failed') {
-                    if (pollInterval) {
-                        clearInterval(pollInterval);
-                        setPollInterval(null);
-                    }
+                    clearInterval(pollInterval);
+                    setPollInterval(null);
+
                     setGenerating(false);
 
                     if (response.data.status === 'failed') {
