@@ -41,31 +41,25 @@ class MessageHandler {
 
     /** Factory method that ensures full initialization */
     public static async create(sessionId: string): Promise<MessageHandler> {
-        console.log(`Creating MessageHandler for session ${sessionId}`);
         const handler = new MessageHandler(sessionId);
         await handler.storeMessages(); // This will throw if it fails
-        const hasMessages = await sessionHasMessages(sessionId);
-        if (hasMessages) {
-            console.log(`Session ${sessionId} has messages, loading them`);
-            await handler.loadMessages(false);
-        }
         return handler;
     }
 
     public async loadMessages(addPerformNextStep: boolean = true): Promise<MessageType[]> {
-        if (this.hasLoaded) return this.messages;
+        if (!this.hasLoaded) {
+            const messages = await getSessionMessages(this.sessionId);
+            if (messages && messages.length > 0) {
+                const finalMessages = addPerformNextStep
+                    ? [...messages, performNextStepSystemPrompt]
+                    : messages;
+                this.messages = finalMessages
+            } else if (this.messages.length === 0) {
+                this.messages = [initialMessageSystemPrompt];
+            }
 
-        const messages = await getSessionMessages(this.sessionId);
-
-        if (!messages || messages.length === 0) {
-            this.messages = [initialMessageSystemPrompt];
-        } else {
-            this.messages = addPerformNextStep
-                ? [...messages, performNextStepSystemPrompt]
-                : messages;
+            this.hasLoaded = true;
         }
-
-        this.hasLoaded = true;
         return this.messages;
     }
 

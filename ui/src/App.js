@@ -1302,8 +1302,6 @@ function App() {
             }
         }
 
-        // Set loading state immediately to ensure polling starts
-        setLoading(true);
         loadingRef.current = true;
 
         // Reset streaming content
@@ -1374,6 +1372,8 @@ function App() {
             await axios.post(`${SERVER_URL}/api/chat/${sessionId}`, {
                 userMessage
             });
+            // Set loading state immediately to ensure polling starts
+            setLoading(true);
             console.log('SEND: Message sent successfully');
 
             // Ensure loading state is still true after API call
