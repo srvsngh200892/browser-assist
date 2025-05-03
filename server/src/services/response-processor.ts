@@ -67,7 +67,7 @@ export // Function to process responses asynchronously
                     console.log(`Token limit threshold reached (${estimatedTokens} tokens). Reducing older tool interactions...`);
                     let newMessages: MessageType[] = messages
                     keepNToolInteractions = keepNToolInteractions - 1
-                    while (keepNToolInteractions >= 2) {
+                    while (keepNToolInteractions > 2) {
                         const reconstructedMessages = reconstructMessages(interactions, keepNToolInteractions);
                         newMessages = [...initialMessages, ...reconstructedMessages];
                         newEstimatedTokens = estimateTokenCount(newMessages);

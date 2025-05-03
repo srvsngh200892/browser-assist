@@ -1063,6 +1063,24 @@ li {
     }
 }
 
+.send-button.pulsing-button {
+    animation: pulsing-button 1s infinite;
+}
+
+@keyframes pulsing-button {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
 .tool-content {
     white-space: pre-wrap;
     font-family: monospace;

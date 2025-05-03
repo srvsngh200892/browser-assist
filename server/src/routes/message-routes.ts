@@ -83,8 +83,6 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
 
         // Set parameters for query
         const since = req.query.since as string | undefined;
-        const limit = parseInt(req.query.limit as string || "50", 10); // Default to 50 messages
-        const page = parseInt(req.query.page as string || "1", 10); // Pagination support
         const lastQueryTime = since ? parseInt(since, 10) : lastRetrievalTime;
 
         // Get messages, either all or just new ones based on the query parameter
@@ -94,16 +92,15 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
             messages = await getNewMessages(sessionId, lastQueryTime);
         } else {
             // Get all messages for the session
-            messages = await messageHandler.getMessages(true); // Force reload from Firebase
+            messages = await messageHandler.getMessagesForUI(); // Force reload from Firebase
         }
 
-        // Apply pagination to limit payload size
-        const totalCount = messages.length;
-        const startIndex = (page - 1) * limit;
-        const endIndex = Math.min(startIndex + limit, messages.length);
-
-        // Get only the paginated subset of messages
-        const paginatedMessages = messages.slice(startIndex, endIndex);
+        let hasMore = true
+        const lastMessage = await messageHandler.getLastMessage();
+        if (lastMessage) {
+            hasMore = !(lastMessage.role === 'assistant' &&
+                (lastMessage as MessageWithExtras).finish_reason === 'stop');
+        }
 
         // Determine if processing is complete
         let isDone = false;
@@ -121,12 +118,9 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         return res.json({
             success: true,
             sessionId,
-            messages: paginatedMessages,
-            totalCount,
-            page,
-            limit,
-            hasMore: endIndex < totalCount,
+            messages,
             isDone,
+            hasMore,
             timestamp: newRetrievalTime
         });
     } catch (error) {
@@ -186,11 +180,8 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
                 error: "Invalid message format"
             });
         }
-        // to be removed after finding root cause
-        console.log('Received user message:', sessionId, JSON.stringify(userMessage, null, 2));
         // Validate and add user message
         await messageHandler.addMessage(userMessage);
-        console.log('Received user message after adding:', sessionId, JSON.stringify(await messageHandler.getMessages(), null, 2));
 
         // We'll continue processing asynchronously
         res.json({

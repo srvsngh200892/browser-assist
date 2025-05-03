@@ -8,8 +8,9 @@ import {
     storeMessage,
     storeMessages,
     getSessionMessages,
-    getLastAssistantMessage,
+    getLastMessage,
     sessionHasMessages,
+    getSessionMessagesForUI,
 } from "./firebase-messages";
 import { updateSessionActivity } from "./firebase-sessions";
 
@@ -90,6 +91,14 @@ class MessageHandler {
             return await getSessionMessages(this.sessionId);
         }
         return this.messages;
+    }
+
+    public async getMessagesForUI(): Promise<MessageType[]> {
+        return await getSessionMessagesForUI(this.sessionId);
+    }
+
+    public async getLastMessage(): Promise<MessageType | null> {
+        return await getLastMessage(this.sessionId);
     }
 
     public async removeMessageAtIndex(index: number): Promise<boolean> {

@@ -128,7 +128,7 @@ function sanitizeYamlLog(log: string) {
     const yamlLines = yamlContent.split('\n');
 
     // More permissive regex that allows nested structures and various attributes
-    const validLineRegex = /^(\s*)-.*(\[ref=\w+]|:\s*$)/;
+    const validLineRegex = /^(\s*)-.*(\[ref=\w+]|:\s*$|text:)/;
 
     const cleanedYaml = yamlLines
         .filter(line => {

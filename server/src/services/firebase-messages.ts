@@ -112,7 +112,7 @@ export async function storeMessages(sessionId: string, messages: MessageType[]) 
 export async function getSessionMessages(sessionId: string, lastRetrievalTime?: number): Promise<MessageType[]> {
     let query = db.collection(MESSAGES_COLLECTION)
         .where("sessionId", "==", sessionId)
-        .orderBy("timestamp", "asc");
+        .orderBy("timestamp", 'asc')
 
     if (lastRetrievalTime) {
         const ts = Timestamp.fromMillis(lastRetrievalTime);
@@ -149,8 +149,51 @@ export async function getSessionMessages(sessionId: string, lastRetrievalTime?: 
     return messages;
 }
 
+export async function getSessionMessagesForUI(sessionId: string, lastRetrievalTime?: number, limit: number = 50): Promise<MessageType[]> {
+    let query = db.collection(MESSAGES_COLLECTION)
+        .where("sessionId", "==", sessionId)
+        .orderBy("timestamp", 'asc')
+
+    if (lastRetrievalTime) {
+        const ts = Timestamp.fromMillis(lastRetrievalTime);
+        query = db.collection(MESSAGES_COLLECTION)
+            .where("sessionId", "==", sessionId)
+            .where("timestamp", ">", ts)
+            .orderBy("timestamp", 'asc')
+    }
+
+    const snapshot = await query.get();
+    const messages: MessageType[] = [];
+    let totalSize = 0;
+
+    for (const doc of snapshot.docs) {
+        const data = doc.data();
+        let msg: MessageType;
+        if (data.isChunked) {
+            try {
+                msg = await getChunkedMessage(data.messageId, data);
+            } catch {
+                continue;
+            }
+        } else {
+            const { timestamp, messageId, sessionId, ...content } = data;
+
+            data.timestamp = data.timestamp.seconds * 1000 + data.timestamp.nanoseconds / 1000000;
+            msg = data as MessageType;
+
+        }
+
+        const size = estimateMessageSize(msg);
+        if (totalSize + size > MAX_PAYLOAD_SIZE) break;
+        messages.push(msg);
+        totalSize += size;
+    }
+
+    return messages;
+}
+
 export async function getNewMessages(sessionId: string, lastRetrievalTime: number): Promise<MessageType[]> {
-    return getSessionMessages(sessionId, lastRetrievalTime);
+    return getSessionMessagesForUI(sessionId, lastRetrievalTime);
 }
 
 export async function sessionHasMessages(sessionId: string): Promise<boolean> {
@@ -159,6 +202,21 @@ export async function sessionHasMessages(sessionId: string): Promise<boolean> {
         .limit(1)
         .get();
     return !snapshot.empty;
+}
+
+export async function getLastMessage(sessionId: string): Promise<MessageType | null> {
+    const snapshot = await db.collection(MESSAGES_COLLECTION)
+        .where("sessionId", "==", sessionId)
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
+
+    if (snapshot.empty) return null;
+    const data = snapshot.docs[0].data();
+    if (data.isChunked) return await getChunkedMessage(data.messageId, data);
+
+    const { timestamp, messageId, sessionId: sid, ...content } = data;
+    return content as MessageType;
 }
 
 export async function getLastAssistantMessage(sessionId: string): Promise<MessageType | null> {
