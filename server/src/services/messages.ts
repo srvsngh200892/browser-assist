@@ -75,6 +75,15 @@ class MessageHandler {
         await updateSessionActivity(this.sessionId);
     }
 
+    public async updateFromStorage(): Promise<void> {
+        if (this.messages.length <= 1 && this.messages[0] && this.messages[0].role == 'system') {
+            const messages = await getSessionMessages(this.sessionId);
+            if (messages && messages.length > 1 ) {
+                this.messages = messages
+            }
+        }
+    }
+
     public async addMessages(messages: MessageType[]): Promise<void> {
         for (const message of messages) {
             await this.addMessage(message);
