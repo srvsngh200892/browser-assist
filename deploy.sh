@@ -80,7 +80,7 @@ run_dev() {
   echo "Environment: Development with Firebase emulator"
   
   # Check if environment file exists and is configured
-  check_env_file "server/src/.env"
+  check_env_file "server/.env"
   
   # Start with Docker Compose
   docker compose up

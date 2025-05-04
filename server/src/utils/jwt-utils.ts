@@ -1,8 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-// JWT Secret - should be in environment variables
-const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret-key-change-in-production";
-
 // User payload interface
 export interface UserPayload {
     userId: string;
@@ -11,12 +8,12 @@ export interface UserPayload {
 }
 
 // Create JWT token with user information
-export async function createToken(user: UserPayload, expiresInHours = 24): Promise<string> {
+export async function createToken(user: UserPayload, jwtSecret: string, expiresInHours = 24): Promise<string> {
     try {
         // Create token with expiration time
         return jwt.sign(
             { ...user },
-            JWT_SECRET,
+            jwtSecret,
             {
                 expiresIn: `${expiresInHours}h`,
                 algorithm: 'HS256'
@@ -29,10 +26,10 @@ export async function createToken(user: UserPayload, expiresInHours = 24): Promi
 }
 
 // Verify JWT token
-export async function verifyToken(token: string): Promise<UserPayload> {
+export async function verifyToken(token: string, jwtSecret: string): Promise<UserPayload> {
     try {
         // Verify token and return payload
-        const payload = jwt.verify(token, JWT_SECRET, {
+        const payload = jwt.verify(token, jwtSecret, {
             algorithms: ['HS256']
         }) as UserPayload & { exp?: number };
 

@@ -4,47 +4,10 @@ import './App.css';
 import SessionInfo from './SessionInfo'; // Import the SessionInfo component
 import Login from './Login'; // Import the Login component
 import ValidationReport from './ValidationReport'; // Import the ValidationReport component
-
-// Set up axios interceptor to add auth token to all requests
-axios.interceptors.request.use(
-    config => {
-        // Skip token for auth, health, and ping endpoints
-        if (config.url.includes('/auth/') || config.url.includes('/health') || config.url.includes('/ping')) {
-            return config;
-        }
-
-        // Get token from localStorage
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    error => {
-        return Promise.reject(error);
-    }
-);
-
-// Add response interceptor to handle auth errors
-axios.interceptors.response.use(
-    response => response,
-    error => {
-        // Handle 401 Unauthorized errors
-        if (error.response && error.response.status === 401) {
-            console.log('Authentication error - redirecting to login');
-            // Clear auth data
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-
-            // Force page reload to redirect to login
-            window.location.reload();
-        }
-        return Promise.reject(error);
-    }
-);
+import api from './api'
 
 // Server URL for backend
-const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = process.env.REACT_APP_SERVER_URL
 
 // Placeholder image for browser preview
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiAvPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCwzMDApIj4KICAgIDx0ZXh0IHg9IjAiIHk9Ii02MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmaWxsPSIjNmI0NmMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgQnJvd3NlciBQcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSItMTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzZjNzU3ZCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+CiAgICAgIE5vIGxpdmUgcHJldmlldyBhdmFpbGFibGUKICAgIDwvdGV4dD4KICAgIDx0ZXh0IHg9IjAiIHk9IjIwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICBDbGljayAiU3RhcnQgU3RyZWFtIiB0byBlbmFibGUgbGl2ZSBwcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgb3IgIlJlZnJlc2ggU2NyZWVuc2hvdCIgdG8gdGFrZSBhIHNpbmdsZSBzY3JlZW5zaG90CiAgICA8L3RleHQ+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCw1MDApIj4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmI0NmMxIiBzdHJva2Utd2lkdGg9IjIiIC8+CiAgICA8dGV4dCB4PSIwIiB5PSI2IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2YjQ2YzEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICA/CiAgICA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4=';
@@ -131,12 +94,110 @@ function App() {
     // Add a ref to track if user has manually scrolled away from bottom
     const userScrolledAwayRef = useRef(false);
 
+
+    /**
+     * Basic stream cleanup (separate from full stopStream)
+     */
+    const cleanupStream = useCallback(() => {
+        if (streamSourceRef.current) {
+            try {
+                console.log('Closing stream connection');
+
+                // Close the EventSource
+                if (streamSourceRef.current.close) {
+                    streamSourceRef.current.close();
+                }
+
+                // Notify server about disconnection
+                const currentSession = sessionIdRef.current;
+                if (currentSession) {
+                    api.post(`/api/stream-disconnect`, {
+                        sessionId: currentSession,
+                        timestamp: Date.now()
+                    }).catch(err => {
+                        console.error('Failed to notify about stream disconnect:', err);
+                    });
+                }
+
+                streamSourceRef.current = null;
+            } catch (err) {
+                console.error('Error cleaning up stream:', err);
+            }
+        }
+    }, []);
+
+    const handleLogout = useCallback((deleteData = true) => {
+        // Get the current session ID
+        const currentSessionId = sessionIdRef.current;
+
+        if (currentSessionId) {
+            // Call the server logout endpoint with only the necessary data
+            try {
+                api.post(`/api/logout`, {
+                    sessionId: currentSessionId,
+                    deleteData: !!deleteData // Ensure boolean
+                }, {
+                    // Add headers to ensure proper content type
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => {
+                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
+                }).catch(error => {
+                    // Log only the error message and status
+                    console.error('Error during server logout:', error.message || 'Unknown error');
+                }).finally(() => {
+                    // Continue with local cleanup regardless of server response
+                    performLocalLogout();
+                });
+            } catch (error) {
+                console.error('Error during logout process:', error.message || 'Unknown error');
+                performLocalLogout(); // Still clean up locally on error
+            }
+        } else {
+            // No session ID, just do local logout
+            performLocalLogout();
+        }
+
+        // Function to handle the local logout process
+        function performLocalLogout() {
+            // Clean up any active streams
+            cleanupStream();
+
+            // Clear all localStorage items
+            localStorage.clear();
+
+            // Reset app state
+            setUser(null);
+            setIsAuthenticated(false);
+            setSessionId(null);
+        }
+    }, [cleanupStream, SERVER_URL]);
+
+    useEffect(() => {
+        const fetchAuthenticationStatus = async () => {
+            try {
+                const response = await api.get(`/api/auth-check`);
+                const { isAuthenticated, user } = response.data;
+                setIsAuthenticated(isAuthenticated);
+                if (isAuthenticated) {
+                    setUser(user);
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                handleLogout();
+            }
+        };
+
+        fetchAuthenticationStatus();
+    }, [handleLogout]);
+
     // Fetch initial messages
     useEffect(() => {
         const fetchInitialMessages = async () => {
             if (!sessionId) return;
             try {
-                const response = await axios.get(`${SERVER_URL}/api/messages/${sessionId}`);
+                const response = await api.get(`/api/messages/${sessionId}`);
                 if (response.data.success && response.data.messages.length > 1) {
                     setMessages(response.data.messages);
                     localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
@@ -188,7 +249,7 @@ function App() {
         if (!sessionId) return;
 
         try {
-            const response = await axios.get(`${SERVER_URL}/api/validation/status/${sessionId}`);
+            const response = await api.get(`api/validation/status/${sessionId}`);
 
             if (response.data.success) {
                 const hasScreens = response.data.hasScreenshots || false;
@@ -265,7 +326,7 @@ function App() {
         if (!sessionIdRef.current) return;
 
         try {
-            const response = await axios.get(`${SERVER_URL}/api/screenshot`, {
+            const response = await api.get(`/api/screenshot`, {
                 params: { sessionId: sessionIdRef.current, _t: Date.now() }
             });
 
@@ -277,37 +338,6 @@ function App() {
             addStatusMessage('warning', `Screenshot failed: ${err.message}`);
         }
     }, [addStatusMessage]);
-
-    /**
-     * Basic stream cleanup (separate from full stopStream)
-     */
-    const cleanupStream = useCallback(() => {
-        if (streamSourceRef.current) {
-            try {
-                console.log('Closing stream connection');
-
-                // Close the EventSource
-                if (streamSourceRef.current.close) {
-                    streamSourceRef.current.close();
-                }
-
-                // Notify server about disconnection
-                const currentSession = sessionIdRef.current;
-                if (currentSession) {
-                    axios.post(`${SERVER_URL}/api/stream-disconnect`, {
-                        sessionId: currentSession,
-                        timestamp: Date.now()
-                    }).catch(err => {
-                        console.error('Failed to notify about stream disconnect:', err);
-                    });
-                }
-
-                streamSourceRef.current = null;
-            } catch (err) {
-                console.error('Error cleaning up stream:', err);
-            }
-        }
-    }, []);
 
     /**
      * Authentication helper functions
@@ -325,74 +355,6 @@ function App() {
             console.warn('LOGIN DEBUG: No session ID found in localStorage after login');
         }
     }, [setSessionId]);
-
-
-    const handleLogout = useCallback((deleteData = true) => {
-        // Get the current session ID
-        const currentSessionId = sessionIdRef.current;
-        console.log('LOGOUT DEBUG: Current session ID:', currentSessionId);
-
-        if (currentSessionId) {
-            // Call the server logout endpoint with only the necessary data
-            try {
-                axios.post(`${SERVER_URL}/api/logout`, {
-                    sessionId: currentSessionId,
-                    deleteData: !!deleteData // Ensure boolean
-                }, {
-                    // Add headers to ensure proper content type
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => {
-                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
-                }).catch(error => {
-                    // Log only the error message and status
-                    console.error('Error during server logout:', error.message || 'Unknown error');
-                }).finally(() => {
-                    // Continue with local cleanup regardless of server response
-                    performLocalLogout();
-                });
-            } catch (error) {
-                console.error('Error during logout process:', error.message || 'Unknown error');
-                performLocalLogout(); // Still clean up locally on error
-            }
-        } else {
-            // No session ID, just do local logout
-            performLocalLogout();
-        }
-
-        // Function to handle the local logout process
-        function performLocalLogout() {
-            // Clean up any active streams
-            cleanupStream();
-
-            // Clear all localStorage items
-            localStorage.clear();
-
-            // Reset app state
-            setUser(null);
-            setIsAuthenticated(false);
-            setSessionId(null);
-        }
-    }, [cleanupStream, SERVER_URL]);
-
-
-
-    // Check for authentication on initial load
-    useEffect(() => {
-        const token = localStorage.getItem('auth_token');
-        const userData = localStorage.getItem('user');
-
-        if (token && userData) {
-            try {
-                setUser(JSON.parse(userData));
-                setIsAuthenticated(true);
-            } catch (e) {
-                console.error('Error parsing user data', e);
-                handleLogout();
-            }
-        }
-    }, [handleLogout]);
 
     /**
      * Initialize session
@@ -477,14 +439,14 @@ function App() {
 
             // Get the last timestamp from localStorage if available
             const lastTimestamp = localStorage.getItem(`lastTimestamp-${sessionId}`);
-            let url = `${SERVER_URL}/api/messages/${sessionId}`;
+            let url = `/api/messages/${sessionId}`;
 
             // Add timestamp parameter if we have a previous timestamp
             if (lastTimestamp) {
                 url += `?since=${lastTimestamp}`;
             }
 
-            response = await axios.get(url, { timeout: 5000 });
+            response = await api.get(url, { timeout: 5000 });
 
             if (response.data.success) {
                 // Store the new timestamp for next poll
@@ -691,7 +653,7 @@ function App() {
                     if (streaming) {
                         // Let server know to pause sending updates (with error handling)
                         try {
-                            axios.post(`${SERVER_URL}/api/stream-control`, {
+                            api.post(`/api/stream-control`, {
                                 sessionId: sessionId,
                                 action: 'pause',
                                 reason: 'response_complete'
@@ -1022,7 +984,7 @@ function App() {
             // Add a small delay to prevent rapid requests
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            const response = await axios.post(`${SERVER_URL}/api/session`, {}, {
+            const response = await api.post(`/api/session`, {}, {
                 timeout: 10000,  // 10 second timeout
             });
 
@@ -1063,7 +1025,7 @@ function App() {
                         console.log('SESSION EXPIRED: Attempting to use cached session after rate limit:', cachedSession);
 
                         // Verify the cached session
-                        const verifyResponse = await axios.get(`${SERVER_URL}/api/health?sessionId=${cachedSession}`)
+                        const verifyResponse = await api.get(`/api/health?sessionId=${cachedSession}`)
                             .catch(e => null);
 
                         if (verifyResponse && verifyResponse.data && verifyResponse.data.success) {
@@ -1262,7 +1224,7 @@ function App() {
 
             // Notify server to resume sending data
             try {
-                axios.post(`${SERVER_URL}/api/stream-control`, {
+                api.post(`/api/stream-control`, {
                     sessionId: sessionId,
                     action: 'resume'
                 }).catch(err => console.log('Server may not support stream resuming yet'));
@@ -1383,7 +1345,7 @@ function App() {
 
             // Send message to server
             console.log('SEND: Sending message to server');
-            await axios.post(`${SERVER_URL}/api/chat/${sessionId}`, {
+            await api.post(`/api/chat/${sessionId}`, {
                 userMessage
             });
             console.log('SEND: Message sent successfully');
@@ -1563,8 +1525,7 @@ function App() {
             const startTime = Date.now();
 
             console.log(`Starting ping #${requestId}`);
-            const response = await axios.get(
-                `${SERVER_URL}/api/health?_t=${requestId}`,
+            const response = await api.get(`/api/health?_t=${requestId}`,
                 {
                     timeout: 5000,
                     signal: controller.signal
@@ -1825,8 +1786,7 @@ function App() {
             healthCheckControllerRef.current = new AbortController();
 
             try {
-                const response = await axios.get(
-                    `${SERVER_URL}/api/health?_t=${requestId}`,
+                const response = await api.get(`/api/health?_t=${requestId}`,
                     {
                         timeout: 8000, // Increased timeout
                         signal: healthCheckControllerRef.current.signal,
@@ -2166,7 +2126,7 @@ function App() {
                                         return (
                                             <div
                                                 key={message.id || `${message.role}-${index}`}
-                                                className={`message ${message.role} ${isTyping ? 'typing' : ''}`}
+                                                className={`message chat-bubble ${message.role} ${isTyping ? 'typing' : ''}`}
                                             >
                                                 <div className="message-role">
                                                     <div className="message-icon">
@@ -2283,15 +2243,26 @@ function App() {
                             </div>
 
                             <div className="input-container">
-                                <input
+                                <textarea
                                     ref={inputRef}
-                                    type="text"
                                     className="message-input"
                                     placeholder="Type your message..."
                                     value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && !loading && handleSendMessage(inputValue) && setInputValue('')}
+                                    onChange={(e) => {
+                                        setInputValue(e.target.value);
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = `${e.target.scrollHeight}px`;
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey && !loading) {
+                                            e.preventDefault();
+                                            handleSendMessage(inputValue);
+                                            setInputValue('');
+                                            e.target.style.height = 'auto';
+                                        }
+                                    }}
                                     disabled={loading}
+                                    rows={1}
                                 />
                                 <button
                                     className={`send-button ${loading ? 'pulsing-button' : ''}`} // Add pulsing class when loading is true

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './Login.css';
-
-const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:3001';
+import api from './api'
 
 function Login({ onLoginSuccess }) {
     const [isLogin, setIsLogin] = useState(true);
@@ -169,14 +167,13 @@ function Login({ onLoginSuccess }) {
                 ? { email: formData.email, password: formData.password }
                 : { username: formData.username, email: formData.email, password: formData.password };
 
-            const response = await axios.post(`${SERVER_URL}${endpoint}`, payload);
+            const response = await api.post(`${endpoint}`, payload);
 
             if (response.data.success) {
                 // Show success message
                 setSuccess(isLogin ? 'Login successful!' : 'Account created successfully!');
 
                 // Store token and user data
-                localStorage.setItem('auth_token', response.data.token);
                 localStorage.setItem('user', JSON.stringify(response.data.user));
 
                 // Store session ID if available (for login)
@@ -318,10 +315,11 @@ function Login({ onLoginSuccess }) {
                             )}
                         </div>
                     )}
-
                     <button type="submit" disabled={loading}>
+                    <span className="button-content">
                         {loading && <span className="loading-indicator"></span>}
-                        {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
+                        <span>{loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}</span>
+                    </span>
                     </button>
                 </form>
 

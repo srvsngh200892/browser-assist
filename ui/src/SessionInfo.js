@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './SessionInfo.css';
-
-// Server URL for backend
-const SERVER_URL = 'http://localhost:3001';
+import api from './api'
 
 /**
  * Session Information Component
@@ -30,7 +27,7 @@ const SessionInfo = ({ sessionId, onError }) => {
             try {
                 setLoading(true);
 
-                const response = await axios.get(`${SERVER_URL}/api/session/${sessionId}`);
+                const response = await api.get(`/api/session/${sessionId}`);
 
                 if (response.data.success) {
                     setSessionData(response.data.session);

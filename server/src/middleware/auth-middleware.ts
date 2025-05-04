@@ -1,36 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { getUserById } from '../services/firebase-users.js';
 import { verifyToken } from '../utils/jwt-utils.js';
 
+const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret-key-change-in-production";
+
 interface AuthRequest extends Request {
-    user?: any; // You can type this based on your payload
+    user?: any;
 }
 
-// Authentication middleware
 export async function authMiddleware(
     req: AuthRequest,
     res: Response,
     next: NextFunction
 ) {
     try {
-        // Get the authorization header
-        const authHeader = req.headers.authorization;
+        // ✅ Read token from cookie
+        const token = req.cookies?.token;
 
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        if (!token) {
             return res.status(401).json({
                 success: false,
-                error: "Authorization required"
+                error: "Authentication token missing",
+                errorCode: 'missing_or_expired'
             });
         }
 
-        // Extract the token
-        const token = authHeader.split(" ")[1];
-
         try {
-            // Use our verifyToken utility function
-            const decoded = await verifyToken(token);
-
-            // Get user from database
+            const decoded = await verifyToken(token, JWT_SECRET);
             const user = await getUserById(decoded.userId);
 
             if (!user) {
@@ -40,20 +37,16 @@ export async function authMiddleware(
                 });
             }
 
-            // Attach user to request object
             req.user = user;
-
-            // Proceed to the next middleware/handler
             next();
         } catch (jwtError) {
             console.error("JWT verification error:", jwtError);
-
-            // Get the error message
             const errorMessage = jwtError instanceof Error ? jwtError.message : "Invalid token";
-
+            const errorCode = jwtError instanceof jwt.TokenExpiredError ? 'token_expired' : 'invalid_token'
             return res.status(401).json({
                 success: false,
-                error: errorMessage
+                error: errorMessage,
+                errorCode: errorCode
             });
         }
     } catch (error) {
@@ -63,4 +56,4 @@ export async function authMiddleware(
             error: "Server error"
         });
     }
-} 
+}
