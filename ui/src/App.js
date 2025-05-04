@@ -131,6 +131,27 @@ function App() {
     // Add a ref to track if user has manually scrolled away from bottom
     const userScrolledAwayRef = useRef(false);
 
+    // Fetch initial messages
+    useEffect(() => {
+        const fetchInitialMessages = async () => {
+            if (!sessionId) return;
+            try {
+                const response = await axios.get(`${SERVER_URL}/api/messages/${sessionId}`);
+                if (response.data.success && response.data.messages.length > 1) {
+                    setMessages(response.data.messages);
+                    localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
+                    if (response.data.hasMore && !response.data.isDone) {
+                        setLoading(true);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching initial messages:', error);
+            }
+        };
+
+        fetchInitialMessages();
+    }, [sessionId]);
+
     // Update refs when state changes
     useEffect(() => {
         const prevMessages = messagesRef.current;
@@ -475,7 +496,7 @@ function App() {
                 if (response.data.messages && response.data.messages.length > 0) {
                     const serverMessages = response.data.messages;
                     const currentMessages = messagesRef.current;
-
+                    localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
                     console.log('POLL: Received messages', {
                         server: serverMessages.length,
                         client: currentMessages.length,
@@ -1347,9 +1368,6 @@ function App() {
             clearTimeout(pollTimerRef.current);
             pollTimerRef.current = null;
         }
-
-        // Start polling now with zero delay
-        pollTimerRef.current = setTimeout(pollForMessages, 0);
 
         try {
             // Check session and create if needed
@@ -2276,7 +2294,7 @@ function App() {
                                     disabled={loading}
                                 />
                                 <button
-                                    className="send-button"
+                                    className={`send-button ${loading ? 'pulsing-button' : ''}`} // Add pulsing class when loading is true
                                     onClick={() => {
                                         handleSendMessage(inputValue);
                                         setInputValue('');

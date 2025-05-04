@@ -270,6 +270,15 @@ export async function getMessageHandler(sessionId: string): Promise<MessageHandl
     if (messageHandler) {
         return messageHandler;
     } else {
-        throw new Error(`No message handler found for session: ${sessionId}`);
+        console.log(`No message Handler found, creating new: ${sessionId}`);
+        const exists = await sessionExists(sessionId);
+        if (exists) {
+            messageHandler = await MessageHandler.create(sessionId);
+            sessionStore.setMessageHandler(sessionId, messageHandler);
+            await messageHandler.updateFromStorage()
+        } else {
+            throw new Error(`Invalid session ${sessionId} not found in Firebase`);
+        }
     }
+    return messageHandler
 }

@@ -1,0 +1,194 @@
+
+[
+
+    // London weather interaction
+    {
+        "role": "assistant",
+        "content": null,
+        "id": "ast-789",
+        "tool_calls": [
+            {
+                "id": "call-abc",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"London\"}"
+                }
+            }
+        ]
+    },
+    {
+        "role": "tool",
+        "content": "{\"temperature\":18,\"condition\":\"cloudy\",\"humidity\":75}",
+        "tool_call_id": "call-abc",
+        "id": "tool-def"
+    },
+    {
+        "role": "assistant",
+        "content": "The current weather in London is cloudy with a temperature of 18°C and 75% humidity.",
+        "id": "ast-ghi",
+        "finish_reason": "stop"
+    },
+    // Paris weather interaction
+    {
+        "role": "user",
+        "content": "What about the weather in Paris?",
+        "id": "usr-789"
+    },
+    {
+        "role": "assistant",
+        "content": null,
+        "id": "ast-101",
+        "tool_calls": [
+            {
+                "id": "call-def",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"Paris\"}"
+                }
+            }
+        ]
+    },
+    {
+        "role": "tool",
+        "content": "{\"temperature\":22,\"condition\":\"sunny\",\"humidity\":60}",
+        "tool_call_id": "call-def",
+        "id": "tool-xyz"
+    },
+    {
+        "role": "assistant",
+        "content": "The weather in Paris is currently sunny with a temperature of 22°C and 60% humidity.",
+        "id": "ast-102",
+        "finish_reason": "stop"
+    },
+    // Tokyo weather interaction
+    {
+        "role": "user",
+        "content": "And Tokyo?",
+        "id": "usr-103"
+    },
+    {
+        "role": "assistant",
+        "content": null,
+        "id": "ast-104",
+        "tool_calls": [
+            {
+                "id": "call-tok",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"Tokyo\"}"
+                }
+            }
+        ]
+    },
+    {
+        "role": "tool",
+        "content": "{\"temperature\":25,\"condition\":\"rainy\",\"humidity\":80}",
+        "tool_call_id": "call-tok",
+        "id": "tool-tok"
+    },
+    {
+        "role": "assistant",
+        "content": "In Tokyo, it's currently rainy with a temperature of 25°C and 80% humidity.",
+        "id": "ast-105",
+        "finish_reason": "stop"
+    },
+    // New York weather interaction
+    {
+        "role": "user",
+        "content": "How about New York?",
+        "id": "usr-106"
+    },
+    {
+        "role": "assistant",
+        "content": null,
+        "id": "ast-107",
+        "tool_calls": [
+            {
+                "id": "call-ny",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"New York\"}"
+                }
+            }
+        ]
+    },
+    {
+        "role": "tool",
+        "content": "{\"temperature\":15,\"condition\":\"clear\",\"humidity\":55}",
+        "tool_call_id": "call-ny",
+        "id": "tool-ny"
+    },
+    {
+        "role": "assistant",
+        "content": "The weather in New York is clear with a temperature of 15°C and 55% humidity.",
+        "id": "ast-108",
+        "finish_reason": "stop"
+    },
+    // Berlin weather interaction
+    {
+        "role": "user",
+        "content": "Finally, what's the weather in Berlin?",
+        "id": "usr-109"
+    },
+    {
+        "role": "assistant",
+        "content": null,
+        "id": "ast-110",
+        "tool_calls": [
+            {
+                "id": "call-ber",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"Berlin\"}"
+                }
+            }
+        ]
+    },
+    {
+        "role": "tool",
+        "content": "{\"temperature\":20,\"condition\":\"partly cloudy\",\"humidity\":65}",
+        "tool_call_id": "call-ber",
+        "id": "tool-ber"
+    },
+    {
+        "role": "assistant",
+        "content": "In Berlin, it's partly cloudy with a temperature of 20°C and 65% humidity.",
+        "id": "ast-111",
+        "finish_reason": "stop"
+    }
+]
+
+
+
+[
+    { role: "system", content: "What about the weather in london?" },
+    { role: "user", content: "What about the weather in london?" },
+    { role: "assistant", content: "The current weather in London..." },
+
+
+    { role: "user", content: "What about the weather in Paris?" },
+    { role: "assistant", content: "The weather in Paris..." },
+
+
+    { role: "user", content: "And Tokyo?" },
+    { role: "assistant", content: null, tool_calls: [] },
+    { role: "tool", content: "" },
+    { role: "assistant", content: "In Tokyo, it's currently..." },
+
+
+    { role: "user", content: "How about New York?" },
+    { role: "assistant", content: null, tool_calls: [] },
+    { role: "tool", content: "" },
+    { role: "assistant", content: "The weather in New York..." },
+
+
+    { role: "user", content: "Finally, what's the weather in Berlin?" },
+    { role: "assistant", content: null, tool_calls: [] },
+    { role: "tool", content: "" },
+    { role: "assistant", content: "In Berlin, it's partly cloudy..." }
+]
