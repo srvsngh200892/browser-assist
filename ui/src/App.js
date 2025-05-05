@@ -23,6 +23,15 @@ const SESSION_CACHE_KEY = 'last-valid-session-id';
 const SESSION_MAX_RETRIES = 5; // Maximum number of retries in a short period
 const SESSION_REQUEST_DEBOUNCE_KEY = 'session-request-debounce'; // Key for tracking recent requests
 const SESSION_REQUEST_DEBOUNCE_TIME = 3000; // 3 seconds debounce time
+const WELCOME_MESSAGE = [
+    {
+        role: 'assistant',
+        content: 'Welcome! I\'m here to help you with your questions and tasks. How can I assist you today?',
+        id: 'welcome-message',
+        is_welcome: true,  // Add a flag to clearly identify the welcome message
+        created_at: new Date().toISOString()
+    }
+]
 
 /**
  * OpenAI MCP Client
@@ -34,15 +43,7 @@ function App() {
 
     // Core state
     const [sessionId, setSessionId] = useState(null);
-    const [messages, setMessages] = useState([
-        {
-            role: 'assistant',
-            content: 'Welcome! I\'m here to help you with your questions and tasks. How can I assist you today?',
-            id: 'welcome-message',
-            is_welcome: true,  // Add a flag to clearly identify the welcome message
-            created_at: new Date().toISOString()
-        }
-    ]);
+    const [messages, setMessages] = useState(WELCOME_MESSAGE);
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -169,6 +170,7 @@ function App() {
 
             // Reset app state
             setUser(null);
+            setMessages(WELCOME_MESSAGE)
             setIsAuthenticated(false);
             setSessionId(null);
         }
@@ -202,6 +204,26 @@ function App() {
                     setMessages(response.data.messages);
                     localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
                     if (response.data.hasMore && !response.data.isDone) {
+                        const typingId = `typing-refresh-${Date.now()}`;
+                        const typingMessage = {
+                            id: typingId,
+                            role: 'assistant',
+                            content: '',
+                            is_typing: true,
+                            created_at: new Date().toISOString()
+                        };
+
+                        setMessages(currentMessages => {
+                            // First remove any existing typing messages
+                            const messagesWithoutTyping = currentMessages.filter(m => !m.is_typing);
+                            // Then add the new typing message at the end
+                            return [...messagesWithoutTyping, typingMessage];
+                        });
+
+                        // Add to typing IDs
+                        setTypingMessageIds(prev =>
+                            [...prev.filter(id => id !== typingId), typingId]
+                        );
                         setLoading(true);
                     }
                 }
@@ -480,6 +502,10 @@ function App() {
                     // Filter out system messages if not showing technical messages
                     const filteredMessages = serverMessages.filter(msg => {
                         if (msg.role === 'system' && !showTechnicalMessages) {
+                            return false;
+                        }
+
+                        if (msg.role === 'user') {
                             return false;
                         }
 
@@ -1318,8 +1344,7 @@ function App() {
         setMessages(updatedMessages);
         messagesRef.current = updatedMessages;
 
-        // Clear typing indicators state
-        setTypingMessageIds([]);
+
         if (typingTimerRef.current) {
             clearTimeout(typingTimerRef.current);
             typingTimerRef.current = null;
@@ -1366,7 +1391,7 @@ function App() {
             // Set up an animation timer to show typing effect for the response
             setTimeout(() => {
                 if (loadingRef.current) {
-                    const typingId = `typing-${Date.now()}`;
+                    const typingId = `typing-assistant-${Date.now()}`;
                     console.log('SEND: Adding typing animation with ID:', typingId);
 
                     // Clear any existing typing timer to prevent conflicts
@@ -1394,23 +1419,8 @@ function App() {
                     });
 
                     // Also add the id to typing message ids
-                    setTypingMessageIds(prev => [...prev.filter(id => id !== typingId), typingId]);
+                    setTypingMessageIds([typingId]);
 
-                    // Auto-remove the placeholder after a maximum of 5 seconds to prevent it 
-                    // from staying on screen permanently (reduced from 8s to 5s)
-                    typingTimerRef.current = setTimeout(() => {
-                        console.log('SEND: Auto-removing typing animation after 5s');
-
-                        // Remove typing ID from state
-                        setTypingMessageIds(prev => prev.filter(id => id !== typingId));
-
-                        // Also explicitly remove the placeholder message
-                        setMessages(currentMessages =>
-                            currentMessages.filter(m => !m.is_typing)
-                        );
-
-                        typingTimerRef.current = null;
-                    }, 5000);
                 }
             }, 100); // Make this faster so typing shows up more quickly
 
@@ -2227,7 +2237,7 @@ function App() {
                                     })}
 
                                 {/* Scroll button */}
-                                {showScrollButton && (
+                                {/* {showScrollButton && (
                                     <div className="scroll-button-wrapper">
                                         <button
                                             className="scroll-button"
@@ -2236,7 +2246,7 @@ function App() {
                                             ↓
                                         </button>
                                     </div>
-                                )}
+                                )} */}
 
                                 {/* Invisible element to scroll to */}
                                 <div ref={messagesEndRef} />
@@ -2269,6 +2279,11 @@ function App() {
                                     onClick={() => {
                                         handleSendMessage(inputValue);
                                         setInputValue('');
+                                        requestAnimationFrame(() => {
+                                            if (inputRef.current) {
+                                              inputRef.current.style.height = 'auto';
+                                            }
+                                        });
                                     }}
                                     disabled={loading || !inputValue.trim()}
                                     aria-label="Send message"

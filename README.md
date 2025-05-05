@@ -23,7 +23,7 @@ With natural language as the interface, this tool makes browser automation acces
 - Generates PDF reports of the test results with conversation histoy
 - MCP (Model Context Protocol) Playwright by Microsoft for browser automation
 - Firebase integration for data persistence
-- User authentication and session management using JWT
+- User authentication and session management using JWT token and refresh token
 - Docker-based deployment for easy setup
 
 ## Architecture
@@ -42,21 +42,6 @@ The project consists of several components:
 - OpenAI API key
 - Firebase project (or Firebase emulator for development)
 - mkcert & generate TLS certs
-
-1. Install mkcert & generate TLS certs
-   bash
-   Copy
-   Edit
-   brew install mkcert # or use your OS’s method
-   mkcert -install
-   mkcert localhost
-   Move the generated files:
-
-bash
-Copy
-Edit
-mv localhost.pem nginx/localhost.pem
-mv localhost-key.pem nginx/localhost-key.pem
 
 ## Getting Started
 
@@ -99,10 +84,8 @@ mv localhost-key.pem nginx/localhost-key.pem
 ```
 
 3. Access the application:
-   - UI: http://localhost:3002
-   - Server API: http://localhost:3001
+   - https://localhost
    - Firebase Emulator: http://localhost:8080
-   - MCP Server: http://localhost:3003
 
 ## API Endpoints
 
@@ -117,6 +100,13 @@ mv localhost-key.pem nginx/localhost-key.pem
 - `POST /api/auth/login`: User login
 - `POST /api/auth/register`: User registration
 - `POST /api/logout`: User logout
+- `POST /api/refresh`: Refresh token
+- `GET /api/auth-check`: Refresh token
+
+### Message Creation and Fetch
+
+- `POST /api/chat/:sessionId`: Sending a new user message
+- `GET /api/message/:sessionId`: Getting all message or message since
 
 ### Browser Streaming
 

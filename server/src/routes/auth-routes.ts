@@ -267,7 +267,7 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
             httpOnly: true,
             secure: true, // Ensure secure cookies in production
             sameSite: 'strict', // Ensure cookie security
-            path: '/' // Clear for all paths
+            path: '/api/refresh' // Clear for all paths
         });
 
         return res.json({
@@ -293,7 +293,6 @@ router.get("/auth-check", authMiddleware, async (req: any, res: Response) => {
 
 router.post('/refresh', async (req: any, res: Response) => {
     const refreshToken = req.cookies?.refresh_token;
-    console.log("getting refesh token", refreshToken)
 
     if (!refreshToken) {
       return res.status(401).json({ success: false, error: 'No refresh token' });
