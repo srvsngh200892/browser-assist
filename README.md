@@ -1,4 +1,5 @@
 # Browser Assist
+
 This AI-powered automation platform allows users to control and observe browser interactions in real-time using natural language prompts. By combining OpenAI's language capabilities with mcp-playwright, the system interprets user instructions and performs corresponding actions in the browser, with live visual feedback.
 
 Designed to eliminate the need for manual scripting, the application streamlines a variety of tasks, including:
@@ -11,7 +12,7 @@ Web Data Exploration: Users can instruct the agent to navigate websites, extract
 
 Regression Checks: Developers can validate UI behavior across multiple changes by describing previously known flows and having the AI replay them on-demand.
 
-Training and Onboarding: New team members can learn product functionality by watching live, prompt-driven interactions rather than reading documentation or watching static videos.
+Many more ...
 
 With natural language as the interface, this tool makes browser automation accessible to both technical and non-technical users.
 
@@ -22,7 +23,7 @@ With natural language as the interface, this tool makes browser automation acces
 - Generates PDF reports of the test results with conversation histoy
 - MCP (Model Context Protocol) Playwright by Microsoft for browser automation
 - Firebase integration for data persistence
-- User authentication and session management using JWT
+- User authentication and session management using JWT token and refresh token
 - Docker-based deployment for easy setup
 
 ## Architecture
@@ -40,20 +41,39 @@ The project consists of several components:
 - Node.js 18+
 - OpenAI API key
 - Firebase project (or Firebase emulator for development)
+- mkcert & generate TLS certs
 
 ## Getting Started
 
 ### Environment Setup
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/srvsngh200892/browser-assist.git
 cd browser-assist
 ```
 
-2. Create a `.env` file in the root directory with the following variables:
+2. For Sever Create a `.env` file in the server directory with the following variables:
+
 ```bash
-Copy the .env.example file to .env and update the variables
+Copy the server/.env.example file to server/.env and update the variables
+```
+
+2. For UI Create a `.env` file in the UI directory with the following variables:
+
+```bash
+Copy the ui/.env.example file to ui/.env and update the variables
+```
+
+3. Setup https
+
+```bash
+brew install mkcert
+mkcert -install
+mkcert localhost
+mv localhost.pem nginx/localhost.pem
+mv localhost-key.pem nginx/localhost-key.pem
 ```
 
 ### Running with Docker
@@ -64,11 +84,8 @@ Copy the .env.example file to .env and update the variables
 ```
 
 3. Access the application:
-   - UI: http://localhost:3002
-   - Server API: http://localhost:3001
+   - https://localhost
    - Firebase Emulator: http://localhost:8080
-   - MCP Server: http://localhost:3003
-
 
 ## API Endpoints
 
@@ -83,6 +100,13 @@ Copy the .env.example file to .env and update the variables
 - `POST /api/auth/login`: User login
 - `POST /api/auth/register`: User registration
 - `POST /api/logout`: User logout
+- `POST /api/refresh`: Refresh token
+- `GET /api/auth-check`: Refresh token
+
+### Message Creation and Fetch
+
+- `POST /api/chat/:sessionId`: Sending a new user message
+- `GET /api/message/:sessionId`: Getting all message or message since
 
 ### Browser Streaming
 
@@ -91,4 +115,3 @@ Copy the .env.example file to .env and update the variables
 - `POST /api/stream-disconnect`: Disconnect from a stream
 
 ## License
-

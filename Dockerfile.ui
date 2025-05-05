@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY ui/package.json ui/package-lock.json ./
-COPY .env ./
+COPY ui/.env ./
 RUN npm ci
 
 # Copy UI source code
@@ -22,7 +22,7 @@ FROM nginx:alpine
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 80

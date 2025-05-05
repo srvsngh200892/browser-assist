@@ -1,2 +1,3 @@
 .env
 *messages.json
+*src/node_modules

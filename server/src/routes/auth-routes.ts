@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
-import { createUser, getUserByEmail, validateUser } from '../services/firebase-users';
-import { createToken } from '../utils/jwt-utils';
+import { createUser, getUserByEmail, validateUser, getUserById } from '../services/firebase-users';
+import { createToken, verifyToken } from '../utils/jwt-utils';
 import {
     createSession,
     getSessionMetadata,
@@ -13,6 +13,10 @@ import {
 } from '../services/firebase-sessions';
 import { authMiddleware } from '../middleware/auth-middleware';
 import sessionStore from '../services/session-store';
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret-key-change-in-production";
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "your-jwt-refresh-secret-key-change-in-production";
+
 
 // Initialize router
 const router = express.Router();
@@ -44,7 +48,14 @@ router.post("/auth/login", async (req: Request, res: Response) => {
             userId: user.userId,
             email: user.email,
             username: user.username
-        });
+        }, JWT_SECRET);
+
+        // Generate JWT refresh token using the utility function
+        const refreshToken = await createToken({
+            userId: user.userId,
+            email: user.email,
+            username: user.username
+        }, JWT_REFRESH_SECRET);
 
         // Create a new session
         const sessionId = uuid();
@@ -55,6 +66,23 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
         await createSession(sessionId, user.userId, sessionMetadata);
         await createMessageHandler(sessionId)
+
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 7200 * 1000 // 1 hour
+        });
+
+
+        res.cookie('refresh_token', refreshToken, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 86400000 ,// 1 hour,
+            path: '/api/refresh',
+        });
+
 
         return res.status(200).json({
             success: true,
@@ -120,8 +148,14 @@ router.post("/auth/register", async (req: Request, res: Response) => {
             userId,
             email,
             username
-        });
+        }, JWT_SECRET);
 
+        // Generate JWT refresh token using the utility function
+        const refreshToken = await createToken({
+            userId,
+            email,
+            username
+        }, JWT_REFRESH_SECRET);
 
         const sessionId = uuid();
         const sessionMetadata = {
@@ -131,6 +165,21 @@ router.post("/auth/register", async (req: Request, res: Response) => {
 
         await createSession(sessionId, userId, sessionMetadata);
         await createMessageHandler(sessionId)
+
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 7200 * 1000// 1 hour
+        });
+
+        res.cookie('refresh_token', refreshToken, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 86400000 ,// 1 hour,
+            path: '/api/refresh',
+        });
 
         return res.status(201).json({
             success: true,
@@ -207,6 +256,20 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
             await updateSessionActivity(sessionId, false);
         }
 
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: true, // Ensure secure cookies in production
+            sameSite: 'strict', // Ensure cookie security
+            path: '/' // Clear for all paths
+        });
+
+        res.clearCookie('refresh_token', {
+            httpOnly: true,
+            secure: true, // Ensure secure cookies in production
+            sameSite: 'strict', // Ensure cookie security
+            path: '/api/refresh' // Clear for all paths
+        });
+
         return res.json({
             success: true,
             message: deleteData
@@ -222,4 +285,59 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
     }
 });
 
-export default router; 
+
+router.get("/auth-check", authMiddleware, async (req: any, res: Response) => {
+    const user = req.user
+    return res.json({ success: true, isAuthenticated: true, user });
+});
+
+router.post('/refresh', async (req: any, res: Response) => {
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      return res.status(401).json({ success: false, error: 'No refresh token' });
+    }
+
+    try {
+      const decoded = await verifyToken(refreshToken, JWT_SECRET);;
+      const user = await getUserById(decoded.userId);
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'User not found' });
+      }
+      // Generate JWT token using the utility function
+      const token = await createToken({
+        userId: user.userId,
+        email: user.email,
+        username: user.username
+       }, JWT_SECRET);
+
+        // Generate JWT token using the utility function
+        const newRefreshToken = await createToken({
+            userId: user.userId,
+            email: user.email,
+            username: user.username
+        }, JWT_REFRESH_SECRET);
+
+       res.cookie('token', token, {
+        httpOnly: true, // Prevents access via JavaScript
+        secure: true, // Use HTTPS in production
+        sameSite: 'strict', // Prevents cross-site request forgery
+        maxAge: 2000
+      });
+
+      res.cookie('refresh_token', newRefreshToken, {
+        httpOnly: true, // Prevents access via JavaScript
+        secure: true, // Use HTTPS in production
+        sameSite: 'strict', // Prevents cross-site request forgery
+        maxAge: 86400000 ,// 1 hour,
+        path: '/api/refresh',
+    });
+
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(403).json({ success: false, error: 'Invalid refresh token' });
+    }
+});
+
+export default router;
