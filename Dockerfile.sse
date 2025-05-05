@@ -11,7 +11,7 @@ RUN npx playwright install-deps
 WORKDIR /app
 
 RUN mkdir -p /app/node_modules && chown -R node:node /app
-
+RUN mkdir -p /app/user-data && chown -R node:node /app/user-data
 USER node
 
 # Copy package files first for better caching
