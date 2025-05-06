@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { createUser, getUserByEmail, validateUser, getUserById } from '../services/firebase-users';
@@ -13,6 +14,8 @@ import {
 } from '../services/firebase-sessions';
 import { authMiddleware } from '../middleware/auth-middleware';
 import sessionStore from '../services/session-store';
+import { MCP_SERVER_BASE_URL } from '../config/env';
+import { removeMcpClient } from '../utils/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret-key-change-in-production";
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "your-jwt-refresh-secret-key-change-in-production";
@@ -201,6 +204,8 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
     try {
         const { sessionId, deleteData = false } = req.body;
 
+        await removeMcpClient(sessionId)
+
         if (!sessionId) {
             return res.status(400).json({
                 success: false,
@@ -269,6 +274,13 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
             sameSite: 'strict', // Ensure cookie security
             path: '/api/refresh' // Clear for all paths
         });
+
+
+        try {
+            await axios.delete(`${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`);
+        } catch(error) {
+            console.error(`error deleting persistent data for ${sessionId} ${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`, error)
+        }
 
         return res.json({
             success: true,

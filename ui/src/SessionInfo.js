@@ -52,24 +52,24 @@ const SessionInfo = ({ sessionId, onError }) => {
         fetchSessionInfo();
 
         // Set up polling interval to refresh session data
-        const intervalId = setInterval(fetchSessionInfo, 30000); // Every 30 seconds
+        const intervalId = setInterval(fetchSessionInfo, 60000); // Every 30 seconds
 
         return () => clearInterval(intervalId);
     }, [sessionId, onError]);
 
     // Format timestamps
     const formatTime = (timestamp) => {
-        if (!timestamp || !timestamp.seconds) return 'N/A';
-        const date = new Date(timestamp.seconds * 1000);
+        if (!timestamp || !timestamp._seconds) return 'N/A';
+        const date = new Date(timestamp._seconds * 1000);
         return date.toLocaleString();
     };
 
     // Format relative time (e.g., "2 minutes ago")
     const getRelativeTime = (timestamp) => {
-        if (!timestamp || !timestamp.seconds) return 'N/A';
+        if (!timestamp || !timestamp._seconds) return 'N/A';
 
         const now = new Date();
-        const then = new Date(timestamp.seconds * 1000);
+        const then = new Date(timestamp._seconds * 1000);
         const diffInSeconds = Math.floor((now - then) / 1000);
 
         if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
@@ -80,10 +80,10 @@ const SessionInfo = ({ sessionId, onError }) => {
 
     // Format elapsed time between two timestamps
     const getElapsedTime = (start, end) => {
-        if (!start || !start.seconds) return 'N/A';
+        if (!start || !start._seconds) return 'N/A';
 
-        const startDate = new Date(start.seconds * 1000);
-        const endDate = end && end.seconds ? new Date(end.seconds * 1000) : new Date();
+        const startDate = new Date(start._seconds * 1000);
+        const endDate = end && end._seconds ? new Date(end._seconds * 1000) : new Date();
 
         const diffInSeconds = Math.floor((endDate - startDate) / 1000);
 
@@ -185,7 +185,7 @@ const SessionInfo = ({ sessionId, onError }) => {
                         <div className="session-info-status-wrapper">
                             <div className={`session-status-indicator ${isActive ? 'active' : 'inactive'}`}></div>
                             <span className={`session-info-value session-status-${sessionData.status}`}>
-                                {sessionData.status}
+                                {isActive ? 'Active' : 'Inactive'}
                             </span>
                         </div>
                     </div>
