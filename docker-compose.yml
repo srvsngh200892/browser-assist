@@ -35,7 +35,7 @@ services:
       - server/.env
     environment:
       - FIREBASE_EMULATOR_HOST=browser-assist-firebase
-      - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/sse
+      - MCP_SERVER_URL=http://playwright-sse-mcp-server:3003/mcp
     volumes:
       - ./src:/app/src
     depends_on:

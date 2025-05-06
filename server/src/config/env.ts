@@ -15,7 +15,7 @@ const MCP_SERVER_COMMAND = process.env.MCP_SERVER_COMMAND!;
 const MCP_SERVER_ARGS = JSON.parse(process.env.MCP_SERVER_ARGS || "[]")!;
 
 // Ensure we have a valid MCP_SERVER_URL with a robust default
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3003/sse";
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3003/mcp";
 const MCP_SERVER_BASE_URL = process.env.MCP_SERVER_BASE_URL || "http://localhost:3003";
 
 const DEBUG = process.env.DEBUG === "true";

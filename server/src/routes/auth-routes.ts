@@ -10,7 +10,8 @@ import {
     updateSessionActivity,
     clearStreamState,
     deleteSession,
-    createMessageHandler
+    createMessageHandler,
+    deleteMcpSession
 } from '../services/firebase-sessions';
 import { authMiddleware } from '../middleware/auth-middleware';
 import sessionStore from '../services/session-store';
@@ -281,7 +282,7 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
         } catch(error) {
             console.error(`error deleting persistent data for ${sessionId} ${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`, error)
         }
-
+        await deleteMcpSession(sessionId)
         return res.json({
             success: true,
             message: deleteData

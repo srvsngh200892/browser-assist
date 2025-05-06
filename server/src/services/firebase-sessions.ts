@@ -72,6 +72,16 @@ export async function getSessionMetadata(sessionId: string): Promise<SessionMeta
     }
 }
 
+export async function deleteMcpSession(sessionId: string): Promise<boolean> {
+    try {
+        await db.collection("mcpSessions").doc(sessionId).delete();
+        return true
+    } catch (error) {
+        console.error("Error getting session metadata:", error);
+        return false;
+    }
+}
+
 export async function updateSessionMetadata(
     sessionId: string,
     updates: Partial<Omit<SessionMetadata, 'sessionId' | 'createdAt'>>

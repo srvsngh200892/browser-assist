@@ -6,8 +6,8 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "build": "tsc",
-        "start": "npm run build && node dist/server.js",
-        "dev": "ts-node src/server.ts"
+        "start": "npm run build && node dist/server-stream.js",
+        "dev": "ts-node src/server-stream.ts"
     },
     "keywords": [],
     "author": "",
@@ -20,7 +20,7 @@
         "typescript": "^5.4.2"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.8.0",
+        "@modelcontextprotocol/sdk": "^1.11.0",
         "@playwright/mcp": "^0.0.9",
         "express": "^5.0.1"
     }
