@@ -171,6 +171,8 @@ function App() {
             // Reset app state
             setUser(null);
             setMessages(WELCOME_MESSAGE)
+            setBrowserImage(PLACEHOLDER_IMAGE)
+            setLoading(false)
             setIsAuthenticated(false);
             setSessionId(null);
         }
