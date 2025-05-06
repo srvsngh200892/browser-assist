@@ -14,6 +14,11 @@ const serverConfig = {
 
 app.get("/sse", async (req: Request, res: Response) => {
     const sessionId = req.query.userSessionId as string;
+    const transportSessionId = req.query.transportSessionId as string;
+    if (transportSessionId) {
+        res.status(200).send(`reusing transport for available transport for ${transportSessionId} for user session ${sessionId}`);
+        return
+    }
     const transport = new SSEServerTransport("/messages", res);
     transports[transport.sessionId] = transport;
     console.log("Transport created for sessionId:", transport.sessionId);

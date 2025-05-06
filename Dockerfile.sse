@@ -33,4 +33,4 @@ RUN npx playwright install chromium
 EXPOSE 3003
 
 # Start the server with the compiled JS (no need to rebuild)
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/server-stream.js"]
