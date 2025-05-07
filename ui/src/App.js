@@ -900,173 +900,6 @@ function App() {
     }, [loading, sessionId, pollForMessages, setLoading, messagesRef]);
 
     /**
-     * Handle session expiration
-     */
-    const handleSessionExpired = useCallback(async () => {
-        // Prevent multiple concurrent session creation attempts
-        if (handleSessionExpired.isCreating) {
-            console.log('SESSION EXPIRED: Session recreation already in progress, skipping duplicate attempt');
-            return;
-        }
-
-        // Check if a session request was made recently
-        try {
-            const lastRequestTime = parseInt(localStorage.getItem(SESSION_REQUEST_DEBOUNCE_KEY) || '0', 10);
-            const now = Date.now();
-            // If a request was made in the last 3 seconds
-            if (now - lastRequestTime < SESSION_REQUEST_DEBOUNCE_TIME) {
-                console.log(`SESSION EXPIRED: Session request made ${now - lastRequestTime}ms ago, skipping duplicate request`);
-
-                // Try to use cached session if available
-                const cachedSession = localStorage.getItem(SESSION_CACHE_KEY);
-                if (cachedSession) {
-                    console.log('SESSION EXPIRED: Using cached session due to debounce:', cachedSession);
-                    setSessionId(cachedSession);
-                    addStatusMessage('info', 'Reusing previous session due to rate limiting');
-                    setError('Reusing previous session. Please try again.');
-
-                    // Set reusing session state to show a notification
-                    setReusingSession(true);
-                    // Auto-clear after a delay
-                    setTimeout(() => {
-                        setReusingSession(false);
-                    }, 5000);
-
-                    return;
-                }
-
-                addStatusMessage('warning', 'Too many session requests, please wait a moment');
-                setError('Too many session requests. Please wait a moment before trying again.');
-                return;
-            }
-
-            // Mark that we're making a request now
-            localStorage.setItem(SESSION_REQUEST_DEBOUNCE_KEY, Date.now().toString());
-            console.log('SESSION EXPIRED: Marked session request timestamp');
-        } catch (e) {
-            console.error('Error with session request debounce in handleSessionExpired:', e);
-        }
-
-        handleSessionExpired.isCreating = true;
-
-        setError('Session expired. Creating a new session...');
-        setSessionId(null);
-        setLoading(false);
-
-        // Reset the browser image to the placeholder when session expires
-        setBrowserImage(PLACEHOLDER_IMAGE);
-
-        // If we were streaming, stop it
-        if (streaming) {
-            stopStream();
-        }
-
-        // Check if we've hit the retry limit (reusing the checkRetryLimits logic)
-        const retryCount = parseInt(localStorage.getItem(SESSION_RETRY_KEY) || '0', 10);
-        const lastRetryTimestamp = parseInt(localStorage.getItem(SESSION_RETRY_TIMESTAMP_KEY) || '0', 10);
-        const now = Date.now();
-        const tooManyRetries = (now - lastRetryTimestamp < 60000 && retryCount >= SESSION_MAX_RETRIES);
-
-        if (tooManyRetries) {
-            console.log('SESSION EXPIRED: Too many session creation attempts in short period');
-            setError('Too many session recreation attempts. Please wait a moment before trying again.');
-            addStatusMessage('error', 'Rate limited: Please wait 60 seconds before trying again');
-
-            // Still increment the counter
-            try {
-                const currentCount = parseInt(localStorage.getItem(SESSION_RETRY_KEY) || '0', 10);
-                localStorage.setItem(SESSION_RETRY_KEY, (currentCount + 1).toString());
-                localStorage.setItem(SESSION_RETRY_TIMESTAMP_KEY, Date.now().toString());
-            } catch (e) {
-                console.error('Error incrementing retry counter:', e);
-            }
-
-            setTimeout(() => {
-                handleSessionExpired.isCreating = false;
-            }, 5000);
-            return;
-        }
-
-        // Increment retry counter in localStorage
-        try {
-            const currentCount = parseInt(localStorage.getItem(SESSION_RETRY_KEY) || '0', 10);
-            localStorage.setItem(SESSION_RETRY_KEY, (currentCount + 1).toString());
-            localStorage.setItem(SESSION_RETRY_TIMESTAMP_KEY, Date.now().toString());
-            console.log(`SESSION EXPIRED: Incremented retry counter to ${currentCount + 1}`);
-        } catch (e) {
-            console.error('Error incrementing retry counter:', e);
-        }
-
-        try {
-            // Add a small delay to prevent rapid requests
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const response = await api.post(`/api/session`, {}, {
-                timeout: 10000,  // 10 second timeout
-            });
-
-            if (response.data.success) {
-                // Cache the successful session ID
-                try {
-                    localStorage.setItem(SESSION_CACHE_KEY, response.data.sessionId);
-                    console.log('SESSION EXPIRED: Cached new session ID:', response.data.sessionId);
-                } catch (e) {
-                    console.error('Error caching session ID:', e);
-                }
-
-                setSessionId(response.data.sessionId);
-                addStatusMessage('system', `New session created: ${response.data.sessionId}`);
-                setError('Session recreated. Please send your message again.');
-            } else {
-                setError(`Failed to create new session: ${response.data.error}`);
-            }
-        } catch (err) {
-            console.error('SESSION EXPIRED: Error creating new session:', err);
-
-            // Handle rate limiting with special message
-            if (err.response && err.response.status === 429) {
-                setError('Too many requests. Please wait a moment before trying again.');
-                addStatusMessage('error', 'Rate limited when creating session. Please wait a moment.');
-
-                // Set the rate limited state
-                setRateLimited(true);
-                // Auto-clear after a delay
-                setTimeout(() => {
-                    setRateLimited(false);
-                }, 60000);
-
-                // Try to use a cached session as fallback
-                try {
-                    const cachedSession = localStorage.getItem(SESSION_CACHE_KEY);
-                    if (cachedSession) {
-                        console.log('SESSION EXPIRED: Attempting to use cached session after rate limit:', cachedSession);
-
-                        // Verify the cached session
-                        const verifyResponse = await api.get(`/api/health?sessionId=${cachedSession}`)
-                            .catch(e => null);
-
-                        if (verifyResponse && verifyResponse.data && verifyResponse.data.success) {
-                            console.log('SESSION EXPIRED: Cached session is valid, using it');
-                            setSessionId(cachedSession);
-                            addStatusMessage('info', 'Using previous session due to rate limiting');
-                            setError('Using previous session. Please try again.');
-                        }
-                    }
-                } catch (cacheErr) {
-                    console.error('SESSION EXPIRED: Error using cached session:', cacheErr);
-                }
-            } else {
-                setError(`Failed to create new session: ${err.message}`);
-            }
-        } finally {
-            // Clear flag after delay
-            setTimeout(() => {
-                handleSessionExpired.isCreating = false;
-            }, 5000); // Increased from 3s to 5s
-        }
-    }, [addStatusMessage]);
-
-    /**
      * Start browser stream
      */
     const startStream = useCallback((options = {}) => {
@@ -1298,7 +1131,6 @@ function App() {
                 // If creating a new session, clear any stored timestamp
                 clearMessageHistory();
 
-                await handleSessionExpired();
                 if (!sessionId) {
                     throw new Error('Session creation failed');
                 }
@@ -1377,7 +1209,6 @@ function App() {
                 addStatusMessage('error', 'Session expired, creating a new one...');
                 // Clear message history for expired session
                 clearMessageHistory();
-                await handleSessionExpired();
             } else {
                 addStatusMessage('error', `Failed to send message: ${err.message}`);
             }
@@ -1385,7 +1216,7 @@ function App() {
 
         // After sending a message, always reset userScrolledAway flag to ensure scroll
         userScrolledAwayRef.current = false;
-    }, [sessionId, setLoading, setMessages, setStreamingContent, pollForMessages, handleSessionExpired, addStatusMessage, clearMessageHistory, resumeStream, streaming, streamStatus]);
+    }, [sessionId, setLoading, setMessages, setStreamingContent, pollForMessages, addStatusMessage, clearMessageHistory, resumeStream, streaming, streamStatus]);
 
     /**
      * Fall back to polling
