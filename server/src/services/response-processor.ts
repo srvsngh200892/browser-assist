@@ -20,6 +20,8 @@ import {
     trimAndAddSystemPrompt
 } from '../utils/conversation-trimmer';
 
+import { updateSessionMetadata } from './firebase-sessions';
+
 import { performNextStepSystemPrompt, initialMessageSystemPrompt } from '../utils/prompts';
 import { v4 as uuid } from 'uuid';
 
@@ -31,7 +33,9 @@ import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 export // Function to process responses asynchronously
     async function processResponse(sessionId: string, messageHandler: MessageHandler) {
     try {
-
+        await updateSessionMetadata(sessionId, {
+            messageProcessing: true
+        })
         // Process with agent loop
         const maxIterations = Number.MAX_SAFE_INTEGER;
         const mcpClient = await getMcpClient(sessionId);
@@ -114,9 +118,15 @@ export // Function to process responses asynchronously
                     await messageHandler.addMessages(toolCallResponse);
                 }
             } catch (error: unknown) {
+                await updateSessionMetadata(sessionId, {
+                    messageProcessing: false
+                })
                 throw error;
             }
         }
+        await updateSessionMetadata(sessionId, {
+            messageProcessing: false
+        })
         console.log(`Processing complete for session ${sessionId}`);
     } catch (error) {
         console.error(`Error in async processing for session ${sessionId}: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -128,6 +138,10 @@ export // Function to process responses asynchronously
             content: `Error processing message: ${error instanceof Error ? error.message : "Unknown error"}`,
             finish_reason: "stop"
         });
+
+        await updateSessionMetadata(sessionId, {
+            messageProcessing: false
+        })
 
     }
 }

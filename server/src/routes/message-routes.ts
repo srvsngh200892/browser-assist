@@ -95,13 +95,7 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
             messages = await messageHandler.getMessagesForUI(); // Force reload from Firebase
         }
 
-        let hasMore = true
-        const lastMessage = await messageHandler.getLastMessage();
-        if (lastMessage) {
-            hasMore = !(lastMessage.role === 'assistant' &&
-                (lastMessage as MessageWithExtras).finish_reason === 'stop');
-        }
-
+        const hasMore = sessionData.messageProcessing
         // Determine if processing is complete
         let isDone = false;
 

@@ -52,7 +52,7 @@ const SessionInfo = ({ sessionId, onError }) => {
         fetchSessionInfo();
 
         // Set up polling interval to refresh session data
-        const intervalId = setInterval(fetchSessionInfo, 60000); // Every 30 seconds
+        const intervalId = setInterval(fetchSessionInfo, 63000); // Every 30 seconds
 
         return () => clearInterval(intervalId);
     }, [sessionId, onError]);
