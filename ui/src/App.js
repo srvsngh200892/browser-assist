@@ -1079,21 +1079,13 @@ function App() {
             return;
         }
 
-        // Clean up any existing stream first
-        cleanupStream();
-
         // Set streaming to true immediately for better visual feedback
         setStreaming(true);
         setStreamStatus('connecting');
         addStatusMessage('info', options.isResume ? 'Resuming browser stream...' : 'Starting browser stream...');
         console.log('STREAM DEBUG: Starting stream with session ID:', sessionId);
 
-        // Connection timeout ID for cleanup
-        let connectionTimeoutId = null;
-
         try {
-            // Close any existing stream
-            cleanupStream();
 
             // Create EventSource directly without redundant health check
             const streamUrl = `${SERVER_URL}/api/browser-stream/${sessionId}?_t=${Date.now()}`;
@@ -1105,40 +1097,10 @@ function App() {
                     '(0=connecting, 1=open, 2=closed)');
                 console.log('STREAM DEBUG: Setting up EventSource handlers...');
 
-                // Set connection timeout
-                connectionTimeoutId = setTimeout(() => {
-                    console.error('STREAM DEBUG: Timeout triggered - connection timed out after 10 seconds');
-                    console.error('STREAM DEBUG: EventSource readyState at timeout:', source.readyState);
-
-                    addStatusMessage('error', 'Stream connection timed out - will retry');
-                    if (source && source.readyState !== 2) { // Not closed
-                        console.log('STREAM DEBUG: Closing EventSource due to timeout');
-                        source.close();
-                    }
-
-                    // Auto-retry after short delay with increasing backoff
-                    if (!window.streamRetryCount) {
-                        window.streamRetryCount = 0;
-                    }
-
-                    window.streamRetryCount++;
-                    const backoffDelay = Math.min(window.streamRetryCount * 1000, 5000);
-
-                    setTimeout(() => {
-                        if (sessionId && !streaming) {
-                            console.log(`STREAM DEBUG: Auto-retrying stream connection (attempt ${window.streamRetryCount})...`);
-                            startStream();
-                        }
-                    }, backoffDelay);
-                }, 10000);
-
                 // Handle connection open
                 source.onopen = () => {
                     console.log('STREAM DEBUG: EventSource.onopen fired! Connection succeeded.');
                     console.log('STREAM DEBUG: EventSource readyState in onopen:', source.readyState);
-
-                    clearTimeout(connectionTimeoutId);
-                    connectionTimeoutId = null;
 
                     // Reset retry count on successful connection
                     window.streamRetryCount = 0;
@@ -1182,10 +1144,6 @@ function App() {
                     if (source.readyState === 2) { // CLOSED
                         console.error('STREAM DEBUG: EventSource connection CLOSED');
                         addStatusMessage('error', 'Stream connection closed by server');
-                        if (connectionTimeoutId) {
-                            clearTimeout(connectionTimeoutId);
-                            connectionTimeoutId = null;
-                        }
                         setStreaming(false);
                         setStreamStatus('error');
                         // Try fallback polling
@@ -1204,12 +1162,6 @@ function App() {
                 addStatusMessage('error', `Stream connection error: ${err.message}`);
                 setStreamStatus('error');
 
-                // Clear timeout
-                if (connectionTimeoutId) {
-                    clearTimeout(connectionTimeoutId);
-                    connectionTimeoutId = null;
-                }
-
                 // Fall back to polling
                 tryPollingFallback();
             }
@@ -1217,13 +1169,6 @@ function App() {
             console.error('STREAM DEBUG: Fatal error creating stream connection:', err);
             addStatusMessage('error', `Stream connection error: ${err.message}`);
             setStreamStatus('error');
-
-            // Clear timeout
-            if (connectionTimeoutId) {
-                clearTimeout(connectionTimeoutId);
-                connectionTimeoutId = null;
-            }
-
             // Fall back to polling
             tryPollingFallback();
         }
