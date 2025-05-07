@@ -185,7 +185,7 @@ function Login({ onLoginSuccess }) {
                 // Slight delay before redirecting for better UX
                 setTimeout(() => {
                     // Notify parent component
-                    onLoginSuccess(response.data.user);
+                    onLoginSuccess(response.data);
                 }, 1000);
             } else {
                 setError(response.data.error || 'Authentication failed');
@@ -340,4 +340,4 @@ function Login({ onLoginSuccess }) {
     );
 }
 
-export default Login; 
+export default Login;

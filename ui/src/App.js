@@ -173,10 +173,11 @@ function App() {
         const fetchAuthenticationStatus = async () => {
             try {
                 const response = await api.get(`/api/auth-check`);
-                const { isAuthenticated, user } = response.data;
+                const { isAuthenticated, user, sessionId } = response.data;
                 setIsAuthenticated(isAuthenticated);
                 if (isAuthenticated) {
                     setUser(user);
+                    setSessionId(sessionId)
                 }
             } catch (error) {
                 console.error('Error checking authentication:', error);
@@ -359,62 +360,12 @@ function App() {
      * Authentication helper functions
      */
     const handleLoginSuccess = useCallback((userData) => {
-        setUser(userData);
+        setUser(userData.user);
+        setSessionId(userData.sessionId);
         setIsAuthenticated(true);
-
-        // Immediately set session ID from localStorage after login
-        const loginSessionId = localStorage.getItem('session_id');
-        if (loginSessionId) {
-            console.log('LOGIN DEBUG: Setting session ID immediately after login:', loginSessionId);
-            setSessionId(loginSessionId);
-        } else {
-            console.warn('LOGIN DEBUG: No session ID found in localStorage after login');
-        }
     }, [setSessionId]);
 
-    /**
-     * Initialize session
-     */
-    useEffect(() => {
-        // Only proceed if authenticated
-        if (!isAuthenticated) {
-            return;
-        }
-
-        // Check if we already have a session ID from login
-        const loginSessionId = localStorage.getItem('session_id');
-
-        if (loginSessionId) {
-            console.log('INIT DEBUG: Using session created during login:', loginSessionId);
-            setSessionId(loginSessionId);
-            // Initialize tools with a small delay
-            setTimeout(async () => {
-                try {
-                    // Set stream status to waiting - this will trigger auto-start
-                    console.log('INIT DEBUG: Setting stream status to waiting to trigger auto-start');
-                    setStreamStatus('waiting');
-
-                    // Take initial screenshot with a small delay
-                    setTimeout(() => {
-                        takeScreenshot();
-                    }, 500);
-                } catch (error) {
-                    console.error('Error initializing tools:', error);
-                }
-            }, 1000);
-        } else {
-            // If somehow we don't have a session ID after login, log an error
-            console.error('INIT DEBUG: No session ID found after login');
-            addStatusMessage('error', 'Session initialization error');
-        }
-
-        // Clean up on unmount
-        return () => {
-            if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-            if (streamSourceRef.current) streamSourceRef.current.close();
-        };
-    }, [isAuthenticated, setSessionId, setStreamStatus, takeScreenshot]);
-
+   
     /**
      * Poll for message updates
      * 
