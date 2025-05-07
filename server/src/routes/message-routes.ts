@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware.js';
-import { getSessionMetadata, updateSessionActivity, getMessageHandler } from '../services/firebase-sessions';
-import { getNewMessages } from '../services/firebase-messages';
+import { getSessionMetadata, updateSessionActivity, getMessageHandler, updatelastMessageRetrieval } from '../services/firebase-sessions';
+import { getNewMessages, getSessionMessagesForUI } from '../services/firebase-messages';
 import { processResponse } from '../services/response-processor';
-import { initialMessageSystemPrompt } from '../utils/prompts';
+import { toMillis } from '../utils/firebase-date-to-milli';
 
 // Define a custom interface for working with tool calls
 interface ToolCall {
@@ -72,27 +72,17 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
             });
         }
 
-        // Update session activity
-        await updateSessionActivity(sessionId);
-
-        // Get or create the message handler for this session
-        const messageHandler = await getMessageHandler(sessionId);
-
-        // Get the last retrieval time
-        const lastRetrievalTime = messageHandler.getLastRetrievalTime();
-
         // Set parameters for query
         const since = req.query.since as string | undefined;
-        const lastQueryTime = since ? parseInt(since, 10) : lastRetrievalTime;
 
         // Get messages, either all or just new ones based on the query parameter
         let messages;
-        if (lastQueryTime > 0 && since) {
+        if (since) {
             // Only get new messages since the last retrieval
-            messages = await getNewMessages(sessionId, lastQueryTime);
+            messages = await getNewMessages(sessionId, parseInt(since, 10));
         } else {
             // Get all messages for the session
-            messages = await messageHandler.getMessagesForUI(); // Force reload from Firebase
+            messages = await getSessionMessagesForUI(sessionId);
         }
 
         const hasMore = sessionData.messageProcessing
@@ -107,7 +97,8 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         }
 
         // Update the last retrieval time
-        const newRetrievalTime = await messageHandler.updateLastRetrievalTime();
+         await updatelastMessageRetrieval(sessionId);
+        const sessionInfo = await getSessionMetadata(sessionId);
 
         return res.json({
             success: true,
@@ -115,7 +106,7 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
             messages,
             isDone,
             hasMore,
-            timestamp: newRetrievalTime
+            timestamp: toMillis(sessionInfo?.lastMessageRetrieval) || Date.now()
         });
     } catch (error) {
         console.error(`Error fetching messages: ${error instanceof Error ? error.message : "Unknown error"}`);

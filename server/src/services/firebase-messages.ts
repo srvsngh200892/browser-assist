@@ -15,6 +15,7 @@ import {
     FIREBASE_PROJECT_ID
 } from "./env";
 import type { MessageType } from "./messages";
+import { toMillis } from "../utils/firebase-date-to-milli";
 
 // Initialize Firebase Admin
 const app = initializeApp({ credential: applicationDefault(), projectId: FIREBASE_PROJECT_ID });
@@ -177,8 +178,7 @@ export async function getSessionMessagesForUI(sessionId: string, lastRetrievalTi
             }
         } else {
             const { timestamp, messageId, sessionId, ...content } = data;
-
-            data.timestamp = data.timestamp.seconds * 1000 + data.timestamp.nanoseconds / 1000000;
+            data.timestamp = toMillis(data.timestamp);
             msg = data as MessageType;
 
         }
