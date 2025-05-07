@@ -22,7 +22,8 @@ export interface SessionMetadata {
     createdAt: FirebaseFirestore.Timestamp;
     lastActive: FirebaseFirestore.Timestamp;
     status: 'active' | 'inactive' | 'expired';
-    messageProcessing: boolean
+    messageProcessing: boolean,
+    lastMessageRetrieval: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
     metadata?: Record<string, any>;
 }
 
@@ -51,6 +52,7 @@ export async function createSession(
             userId,
             createdAt: FieldValue.serverTimestamp() as any,
             lastActive: FieldValue.serverTimestamp() as any,
+            lastMessageRetrieval: FieldValue.serverTimestamp() as any,
             status: 'active',
             messageProcessing: false,
             metadata,
@@ -129,6 +131,10 @@ export async function setSessionStatus(sessionId: string, status: 'active' | 'in
     return updateSessionMetadata(sessionId, { status });
 }
 
+export async function  updatelastMessageRetrieval(sessionId: string): Promise<boolean> {
+    return updateSessionMetadata(sessionId, { lastMessageRetrieval: FieldValue.serverTimestamp() });
+}
+
 export async function sessionExists(sessionId: string): Promise<boolean> {
     try {
         const sessionDoc = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
@@ -176,7 +182,6 @@ export async function setStreamState(
         return false;
     }
 }
-
 export async function getStreamState(sessionId: string): Promise<StreamState | null> {
     try {
         const docSnap = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
