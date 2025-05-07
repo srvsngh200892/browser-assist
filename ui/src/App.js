@@ -128,46 +128,43 @@ function App() {
     }, []);
 
     const handleLogout = useCallback((deleteData = true) => {
-        // Get the current session ID
         const currentSessionId = sessionIdRef.current;
-
         if (currentSessionId) {
-            // Call the server logout endpoint with only the necessary data
-            try {
-                cleanupStream()
-                api.post(`/api/logout`, {
-                    sessionId: currentSessionId,
-                    deleteData: !!deleteData // Ensure boolean
-                }, {
-                    // Add headers to ensure proper content type
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => {
-                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
-                    cleanupStream();
-
-                    // Clear all localStorage items
-                    localStorage.clear();
-        
-                    // Reset app state
-                    setUser(null);
-                    setMessages(WELCOME_MESSAGE)
-                    setBrowserImage(PLACEHOLDER_IMAGE)
-                    setLoading(false)
-                    setIsAuthenticated(false);
-                    setSessionId(null);
-                }).catch(error => {
-                    // Log only the error message and status
-                    console.error(`error Logout successful on server ${error}`);
-                    throw error;
-                })
-            } catch (error) {
-                console.error('Error during logout process:', error.message || 'Unknown error');
-                throw error;
-            }
+          try {
+            cleanupStream();
+            api.post(`/api/logout`, {
+              sessionId: currentSessionId,
+              deleteData: !!deleteData
+            }, {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }).then(() => {
+              console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
+              cleanupStream();
+              localStorage.clear();
+              // Reset app state
+              setUser(null);
+              setMessages(WELCOME_MESSAGE);
+              setBrowserImage(PLACEHOLDER_IMAGE);
+              setLoading(false);
+              setIsAuthenticated(false);
+              setSessionId(null);
+      
+              // ✅ Now reload after everything is cleaned up
+              setTimeout(() => {
+                window.location.href = window.location.origin; // more reliable than reload()
+              }, 50);
+            }).catch(error => {
+              console.error(`Logout error: ${error}`);
+              throw error;
+            });
+          } catch (error) {
+            console.error('Error during logout process:', error.message || 'Unknown error');
+            throw error;
+          }
         }
-    }, [cleanupStream]);
+      }, [cleanupStream]);
 
     useEffect(() => {
         const fetchAuthenticationStatus = async () => {
