@@ -6,6 +6,7 @@
 *firestore-debug.log
 *ui-debug.log
 *server/node_modules/
+*mcp-playwright-sse-sever/node_modules
 *ui/node_modules/
 *ui/build/
 *server/dist/

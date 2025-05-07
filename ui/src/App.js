@@ -134,6 +134,7 @@ function App() {
         if (currentSessionId) {
             // Call the server logout endpoint with only the necessary data
             try {
+                cleanupStream()
                 api.post(`/api/logout`, {
                     sessionId: currentSessionId,
                     deleteData: !!deleteData // Ensure boolean
@@ -144,39 +145,29 @@ function App() {
                     }
                 }).then(() => {
                     console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
+                    cleanupStream();
+
+                    // Clear all localStorage items
+                    localStorage.clear();
+        
+                    // Reset app state
+                    setUser(null);
+                    setMessages(WELCOME_MESSAGE)
+                    setBrowserImage(PLACEHOLDER_IMAGE)
+                    setLoading(false)
+                    setIsAuthenticated(false);
+                    setSessionId(null);
                 }).catch(error => {
                     // Log only the error message and status
-                    console.error('Error during server logout:', error.message || 'Unknown error');
-                }).finally(() => {
-                    // Continue with local cleanup regardless of server response
-                    performLocalLogout();
-                });
+                    console.error(`error Logout successful on server ${error}`);
+                    throw error;
+                })
             } catch (error) {
                 console.error('Error during logout process:', error.message || 'Unknown error');
-                performLocalLogout(); // Still clean up locally on error
+                throw error;
             }
-        } else {
-            // No session ID, just do local logout
-            performLocalLogout();
         }
-
-        // Function to handle the local logout process
-        function performLocalLogout() {
-            // Clean up any active streams
-            cleanupStream();
-
-            // Clear all localStorage items
-            localStorage.clear();
-
-            // Reset app state
-            setUser(null);
-            setMessages(WELCOME_MESSAGE)
-            setBrowserImage(PLACEHOLDER_IMAGE)
-            setLoading(false)
-            setIsAuthenticated(false);
-            setSessionId(null);
-        }
-    }, [cleanupStream, SERVER_URL]);
+    }, [cleanupStream]);
 
     useEffect(() => {
         const fetchAuthenticationStatus = async () => {
@@ -206,6 +197,7 @@ function App() {
                     setMessages(response.data.messages);
                     localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
                     if (response.data.hasMore && !response.data.isDone) {
+                        console.log("having more message to pull", JSON.stringify(response.data, null, 2))
                         const typingId = `typing-refresh-${Date.now()}`;
                         const typingMessage = {
                             id: typingId,
@@ -395,7 +387,6 @@ function App() {
         if (loginSessionId) {
             console.log('INIT DEBUG: Using session created during login:', loginSessionId);
             setSessionId(loginSessionId);
-
             // Initialize tools with a small delay
             setTimeout(async () => {
                 try {
@@ -677,21 +668,19 @@ function App() {
                         typingTimerRef.current = null;
                     }
 
-                    // Don't stop stream completely, just pause it (switch to "waiting" state)
-                    if (streaming) {
-                        // Let server know to pause sending updates (with error handling)
-                        try {
-                            api.post(`/api/stream-control`, {
-                                sessionId: sessionId,
-                                action: 'pause',
-                                reason: 'response_complete'
-                            }).catch(err => console.log('Server may not support stream pausing yet'));
-                            console.log('POLL: Pausing stream since response is complete');
-                            setStreamStatus('waiting');
-                        } catch (err) {
-                            console.error('Error in stream pause notification:', err);
-                        }
+                    // Let server know to pause sending updates (with error handling)
+                    try {
+                        api.post(`/api/stream-control`, {
+                            sessionId: sessionId,
+                            action: 'pause',
+                            reason: 'response_complete'
+                        }).catch(err => console.log('Server may not support stream pausing yet'));
+                        console.log('POLL: Pausing stream since response is complete');
+                        setStreamStatus('waiting');
+                    } catch (err) {
+                        console.error('Error in stream pause notification:', err);
                     }
+
 
                     // No need to schedule further polling - explicitly clear any existing timer
                     if (pollTimerRef.current) {
@@ -1673,206 +1662,206 @@ function App() {
         };
     }, [handleChatScroll]);
 
-    /**
-     * Auto-start stream when session is ready
-     */
-    useEffect(() => {
-        // Prevent auto-start if in connecting status or no session
-        if (!sessionId || streaming || streamStatus !== 'waiting') {
-            console.log('STREAM DEBUG: Not auto-starting stream:', {
-                hasSession: !!sessionId,
-                isStreaming: streaming,
-                streamStatus
-            });
-            return;
-        }
+    // /**
+    //  * Auto-start stream when session is ready
+    //  */
+    // useEffect(() => {
+    //     // Prevent auto-start if in connecting status or no session
+    //     if (!sessionId || streaming || streamStatus !== 'waiting') {
+    //         console.log('STREAM DEBUG: Not auto-starting stream:', {
+    //             hasSession: !!sessionId,
+    //             isStreaming: streaming,
+    //             streamStatus
+    //         });
+    //         return;
+    //     }
 
-        console.log('STREAM DEBUG: Auto-starting stream due to valid session:', sessionId);
+    //     console.log('STREAM DEBUG: Auto-starting stream due to valid session:', sessionId);
 
-        // Prevent duplicate start attempts - add a static flag
-        if (window.streamStarting) {
-            console.log('STREAM DEBUG: Stream start already in progress');
-            return;
-        }
+    //     // Prevent duplicate start attempts - add a static flag
+    //     if (window.streamStarting) {
+    //         console.log('STREAM DEBUG: Stream start already in progress');
+    //         return;
+    //     }
 
-        window.streamStarting = true;
+    //     window.streamStarting = true;
 
-        // Use a flag to ensure we only attempt to start the stream once
-        let streamStartAttempted = false;
-        let startTimerId = null;
-        let fallbackTimerId = null;
+    //     // Use a flag to ensure we only attempt to start the stream once
+    //     let streamStartAttempted = false;
+    //     let startTimerId = null;
+    //     let fallbackTimerId = null;
 
-        // Start with a shorter delay (2 seconds) to improve responsiveness
-        startTimerId = setTimeout(() => {
-            if (!streamStartAttempted && sessionId && !streaming && streamStatus === 'waiting') {
-                console.log('STREAM DEBUG: Starting stream after delay');
-                streamStartAttempted = true;
+    //     // Start with a shorter delay (2 seconds) to improve responsiveness
+    //     startTimerId = setTimeout(() => {
+    //         if (!streamStartAttempted && sessionId && !streaming && streamStatus === 'waiting') {
+    //             console.log('STREAM DEBUG: Starting stream after delay');
+    //             streamStartAttempted = true;
 
-                // Call startStream directly
-                startStream();
+    //             // Call startStream directly
+    //             startStream();
 
-                // Immediately change the status to connecting to prevent flickering
-                setStreamStatus('connecting');
+    //             // Immediately change the status to connecting to prevent flickering
+    //             setStreamStatus('connecting');
 
-                // Add a fallback in case start doesn't work
-                fallbackTimerId = setTimeout(() => {
-                    if (streamStatus !== 'active' && sessionId) {
-                        console.log('STREAM DEBUG: Stream failed to start, falling back to screenshot polling');
-                        tryPollingFallback();
-                    }
-                }, 15000); // Wait 15 seconds before assuming stream failed to start
+    //             // Add a fallback in case start doesn't work
+    //             fallbackTimerId = setTimeout(() => {
+    //                 if (streamStatus !== 'active' && sessionId) {
+    //                     console.log('STREAM DEBUG: Stream failed to start, falling back to screenshot polling');
+    //                     tryPollingFallback();
+    //                 }
+    //             }, 15000); // Wait 15 seconds before assuming stream failed to start
 
-                // Reset the static flag after a delay
-                setTimeout(() => {
-                    window.streamStarting = false;
-                }, 5000);
-            } else {
-                window.streamStarting = false;
-            }
-        }, 2000); // Reduced from 3.5s to 2s
+    //             // Reset the static flag after a delay
+    //             setTimeout(() => {
+    //                 window.streamStarting = false;
+    //             }, 5000);
+    //         } else {
+    //             window.streamStarting = false;
+    //         }
+    //     }, 2000); // Reduced from 3.5s to 2s
 
-        return () => {
-            if (startTimerId) clearTimeout(startTimerId);
-            if (fallbackTimerId) clearTimeout(fallbackTimerId);
-        };
-    }, [sessionId, streaming, streamStatus, startStream, tryPollingFallback]);
+    //     return () => {
+    //         if (startTimerId) clearTimeout(startTimerId);
+    //         if (fallbackTimerId) clearTimeout(fallbackTimerId);
+    //     };
+    // }, [sessionId, streaming, streamStatus, startStream, tryPollingFallback]);
 
     /**
      * Monitor server health when streaming
      */
-    useEffect(() => {
-        // Only run health monitoring when streaming is active
-        if (!streaming || !sessionId) return;
+    // useEffect(() => {
+    //     // Only run health monitoring when streaming is active
+    //     if (!streaming || !sessionId) return;
 
-        console.log('STREAM DEBUG: Starting server health monitoring');
+    //     console.log('STREAM DEBUG: Starting server health monitoring');
 
-        // Use a ref to track if a health check is already in progress
-        const healthCheckInProgressRef = { current: false };
-        // Track the last successful health check time
-        const lastSuccessfulCheckRef = { current: Date.now() };
-        // Track consecutive failures
-        const consecutiveFailuresRef = { current: 0 };
-        // Create a separate object to track last request time
-        const lastRequestTimeRef = { current: 0 };
-        // Track retry count in a ref object, not on the interval ID
-        const retryCountRef = { current: 0 };
+    //     // Use a ref to track if a health check is already in progress
+    //     const healthCheckInProgressRef = { current: false };
+    //     // Track the last successful health check time
+    //     const lastSuccessfulCheckRef = { current: Date.now() };
+    //     // Track consecutive failures
+    //     const consecutiveFailuresRef = { current: 0 };
+    //     // Create a separate object to track last request time
+    //     const lastRequestTimeRef = { current: 0 };
+    //     // Track retry count in a ref object, not on the interval ID
+    //     const retryCountRef = { current: 0 };
 
-        // Check server health less frequently - every 30 seconds instead of 15
-        const healthCheckInterval = setInterval(async () => {
-            // Skip if another health check is already running
-            if (healthCheckInProgressRef.current) {
-                console.log('STREAM DEBUG: Health check already in progress, skipping');
-                return;
-            }
+    //     // Check server health less frequently - every 30 seconds instead of 15
+    //     const healthCheckInterval = setInterval(async () => {
+    //         // Skip if another health check is already running
+    //         if (healthCheckInProgressRef.current) {
+    //             console.log('STREAM DEBUG: Health check already in progress, skipping');
+    //             return;
+    //         }
 
-            // Mark health check as in progress
-            healthCheckInProgressRef.current = true;
+    //         // Mark health check as in progress
+    //         healthCheckInProgressRef.current = true;
 
-            // Add debouncing
-            if (lastRequestTimeRef.current &&
-                (Date.now() - lastRequestTimeRef.current < 15000)) {
-                console.log('STREAM DEBUG: Health check too soon after previous check, skipping');
-                healthCheckInProgressRef.current = false;
-                return;
-            }
+    //         // Add debouncing
+    //         if (lastRequestTimeRef.current &&
+    //             (Date.now() - lastRequestTimeRef.current < 15000)) {
+    //             console.log('STREAM DEBUG: Health check too soon after previous check, skipping');
+    //             healthCheckInProgressRef.current = false;
+    //             return;
+    //         }
 
-            // Track this request time
-            lastRequestTimeRef.current = Date.now();
+    //         // Track this request time
+    //         lastRequestTimeRef.current = Date.now();
 
-            // Create a unique request ID to track this specific request
-            const requestId = Date.now();
-            console.log(`STREAM DEBUG: Starting health check #${requestId}`);
+    //         // Create a unique request ID to track this specific request
+    //         const requestId = Date.now();
+    //         console.log(`STREAM DEBUG: Starting health check #${requestId}`);
 
-            // Create a new AbortController for this health check
-            if (healthCheckControllerRef.current) {
-                // Cancel previous request if it exists
-                try {
-                    healthCheckControllerRef.current.abort();
-                    console.log('STREAM DEBUG: Cancelled previous health check request');
-                } catch (e) {
-                    console.error('Error cancelling previous health check:', e);
-                }
-            }
+    //         // Create a new AbortController for this health check
+    //         if (healthCheckControllerRef.current) {
+    //             // Cancel previous request if it exists
+    //             try {
+    //                 healthCheckControllerRef.current.abort();
+    //                 console.log('STREAM DEBUG: Cancelled previous health check request');
+    //             } catch (e) {
+    //                 console.error('Error cancelling previous health check:', e);
+    //             }
+    //         }
 
-            // Create new controller
-            healthCheckControllerRef.current = new AbortController();
+    //         // Create new controller
+    //         healthCheckControllerRef.current = new AbortController();
 
-            try {
-                const response = await api.get(`/api/health?_t=${requestId}`,
-                    {
-                        timeout: 8000, // Increased timeout
-                        signal: healthCheckControllerRef.current.signal,
-                        headers: {
-                            'X-Request-ID': `health-${requestId}`  // Add unique request ID
-                        }
-                    }
-                );
+    //         try {
+    //             const response = await api.get(`/api/health?_t=${requestId}`,
+    //                 {
+    //                     timeout: 8000, // Increased timeout
+    //                     signal: healthCheckControllerRef.current.signal,
+    //                     headers: {
+    //                         'X-Request-ID': `health-${requestId}`  // Add unique request ID
+    //                     }
+    //                 }
+    //             );
 
-                if (response.data && response.data.success) {
-                    console.log(`STREAM DEBUG: Health check #${requestId} passed`);
-                    lastSuccessfulCheckRef.current = Date.now();
-                    consecutiveFailuresRef.current = 0; // Reset failure counter
-                    // Reset retry count on success
-                    retryCountRef.current = 0;
-                } else {
-                    console.warn(`STREAM DEBUG: Health check #${requestId} returned unexpected response`, response.data);
-                    consecutiveFailuresRef.current++;
-                }
-            } catch (err) {
-                // Check if this is a cancellation error (which we can safely ignore)
-                if (err.name === 'AbortError' || err.name === 'CanceledError' || (axios.isCancel && axios.isCancel(err))) {
-                    console.log(`STREAM DEBUG: Health check #${requestId} was cancelled, ignoring`);
-                } else {
-                    console.error(`STREAM DEBUG: Health check #${requestId} failed:`, err);
+    //             if (response.data && response.data.success) {
+    //                 console.log(`STREAM DEBUG: Health check #${requestId} passed`);
+    //                 lastSuccessfulCheckRef.current = Date.now();
+    //                 consecutiveFailuresRef.current = 0; // Reset failure counter
+    //                 // Reset retry count on success
+    //                 retryCountRef.current = 0;
+    //             } else {
+    //                 console.warn(`STREAM DEBUG: Health check #${requestId} returned unexpected response`, response.data);
+    //                 consecutiveFailuresRef.current++;
+    //             }
+    //         } catch (err) {
+    //             // Check if this is a cancellation error (which we can safely ignore)
+    //             if (err.name === 'AbortError' || err.name === 'CanceledError' || (axios.isCancel && axios.isCancel(err))) {
+    //                 console.log(`STREAM DEBUG: Health check #${requestId} was cancelled, ignoring`);
+    //             } else {
+    //                 console.error(`STREAM DEBUG: Health check #${requestId} failed:`, err);
 
-                    // Handle rate limiting with exponential backoff
-                    if (err.response && err.response.status === 429) {
-                        console.log('STREAM DEBUG: Health check rate limited (429)');
+    //                 // Handle rate limiting with exponential backoff
+    //                 if (err.response && err.response.status === 429) {
+    //                     console.log('STREAM DEBUG: Health check rate limited (429)');
 
-                        // Track retry count in the ref object
-                        retryCountRef.current++;
+    //                     // Track retry count in the ref object
+    //                     retryCountRef.current++;
 
-                        // Calculate backoff delay (2s, 4s, 8s, 16s...)
-                        const backoffDelay = Math.min(Math.pow(2, retryCountRef.current) * 1000, 30000);
+    //                     // Calculate backoff delay (2s, 4s, 8s, 16s...)
+    //                     const backoffDelay = Math.min(Math.pow(2, retryCountRef.current) * 1000, 30000);
 
-                        console.log(`STREAM DEBUG: Will retry health check after ${backoffDelay}ms (attempt ${retryCountRef.current})`);
+    //                     console.log(`STREAM DEBUG: Will retry health check after ${backoffDelay}ms (attempt ${retryCountRef.current})`);
 
-                        // Don't increment failure counter for rate limits
-                    } else {
-                        addStatusMessage('error', `Server connection error: ${err.message}`);
-                        consecutiveFailuresRef.current++;
+    //                     // Don't increment failure counter for rate limits
+    //                 } else {
+    //                     addStatusMessage('error', `Server connection error: ${err.message}`);
+    //                     consecutiveFailuresRef.current++;
 
-                        // Only restart stream if we have consecutive failures and more than 20 seconds since last success
-                        const timeSinceLastSuccess = Date.now() - lastSuccessfulCheckRef.current;
-                        if (streaming && consecutiveFailuresRef.current >= 3 && timeSinceLastSuccess > 20000) {
-                            console.error('STREAM DEBUG: Multiple health check failures, triggering stream restart');
-                            restartStream();
-                            consecutiveFailuresRef.current = 0; // Reset after restart attempt
-                        }
-                    }
-                }
-            } finally {
-                // Always mark health check as complete, even if it failed
-                healthCheckInProgressRef.current = false;
-            }
-        }, 30000); // Increase interval from 15s to 30s
+    //                     // Only restart stream if we have consecutive failures and more than 20 seconds since last success
+    //                     const timeSinceLastSuccess = Date.now() - lastSuccessfulCheckRef.current;
+    //                     if (streaming && consecutiveFailuresRef.current >= 3 && timeSinceLastSuccess > 20000) {
+    //                         console.error('STREAM DEBUG: Multiple health check failures, triggering stream restart');
+    //                         restartStream();
+    //                         consecutiveFailuresRef.current = 0; // Reset after restart attempt
+    //                     }
+    //                 }
+    //             }
+    //         } finally {
+    //             // Always mark health check as complete, even if it failed
+    //             healthCheckInProgressRef.current = false;
+    //         }
+    //     }, 30000); // Increase interval from 15s to 30s
 
-        // Clean up on unmount or when streaming stops
-        return () => {
-            clearInterval(healthCheckInterval);
-            console.log('STREAM DEBUG: Stopping server health monitoring');
+    //     // Clean up on unmount or when streaming stops
+    //     return () => {
+    //         clearInterval(healthCheckInterval);
+    //         console.log('STREAM DEBUG: Stopping server health monitoring');
 
-            // Abort any in-progress health check
-            if (healthCheckControllerRef.current) {
-                try {
-                    healthCheckControllerRef.current.abort();
-                    healthCheckControllerRef.current = null;
-                } catch (e) {
-                    console.error('Error aborting health check on cleanup:', e);
-                }
-            }
-        };
-    }, [sessionId, streaming, addStatusMessage, restartStream]);
+    //         // Abort any in-progress health check
+    //         if (healthCheckControllerRef.current) {
+    //             try {
+    //                 healthCheckControllerRef.current.abort();
+    //                 healthCheckControllerRef.current = null;
+    //             } catch (e) {
+    //                 console.error('Error aborting health check on cleanup:', e);
+    //             }
+    //         }
+    //     };
+    // }, [sessionId, streaming, addStatusMessage, restartStream]);
 
     /**
      * Toggle technical messages
@@ -1932,20 +1921,20 @@ function App() {
     }, [messages]);
 
     // Add function to periodically clean up duplicate messages
-    useEffect(() => {
-        // Skip if we don't have enough messages to deduplicate
-        if (messagesRef.current.length <= 2) return;
+    // useEffect(() => {
+    //     // Skip if we don't have enough messages to deduplicate
+    //     if (messagesRef.current.length <= 2) return;
 
-        // Check for duplicates
-        const currentMessages = messagesRef.current;
-        const deduplicated = deduplicateMessages(currentMessages);
+    //     // Check for duplicates
+    //     const currentMessages = messagesRef.current;
+    //     const deduplicated = deduplicateMessages(currentMessages);
 
-        // If we found and removed duplicates, update the messages
-        if (deduplicated.length < currentMessages.length) {
-            console.log(`Removing ${currentMessages.length - deduplicated.length} duplicate messages`);
-            setMessages(deduplicated);
-        }
-    }, [messages, deduplicateMessages]);
+    //     // If we found and removed duplicates, update the messages
+    //     if (deduplicated.length < currentMessages.length) {
+    //         console.log(`Removing ${currentMessages.length - deduplicated.length} duplicate messages`);
+    //         setMessages(deduplicated);
+    //     }
+    // }, [messages, deduplicateMessages]);
 
     // Add a reconnection function that gets called when a stream ends or errors
     const reconnectToStream = useCallback(() => {

@@ -45,10 +45,10 @@ app.post('/mcp', async (req, res) => {
         delete transports[transport.sessionId];
       }
     };
-    const userDataDir = path.resolve(process.env.USER_DATA_DIR || '', userSessionId);
-    // Ensure the directory exists (optional, Playwright can create it)
-    fs.mkdirSync(userDataDir, { recursive: true });
-    const server = createServer({userDataDir, ...serverConfig});
+    // const userDataDir = path.resolve(process.env.USER_DATA_DIR || '', userSessionId);
+    // // Ensure the directory exists (optional, Playwright can create it)
+    // fs.mkdirSync(userDataDir, { recursive: true });
+    const server = createServer({...serverConfig});
     await server.connect(transport);;
   } else {
     // Invalid request
@@ -85,6 +85,44 @@ app.get('/mcp', handleSessionRequest);
 
 // Handle DELETE requests for session termination
 app.delete('/mcp', handleSessionRequest);
+
+app.delete("/delete-session-folder/:sessionId", async (req: express.Request, res: express.Response) => {
+  const sessionId = req.params.sessionId;
+
+  if (!sessionId) {
+      res.status(400).json({ error: "Missing sessionId in URL path" });
+      return;
+  }
+
+  const baseDir = process.env.USER_DATA_DIR || '';
+
+  const userDataDir = path.resolve(baseDir, sessionId);
+
+  try {
+      const exists = fs.existsSync(userDataDir);
+
+      if (exists) {
+          fs.rmSync(userDataDir, { recursive: true, force: true });
+          res.status(200).json({
+              message: "Session folder deleted",
+              path: userDataDir
+          });
+          return;
+      } else {
+          res.status(200).json({
+              error: "Folder does not exist",
+              path: userDataDir
+          });
+      }
+  } catch (err: any) {
+      console.log("error", err)
+      res.status(500).json({
+          error: "Failed to delete folder",
+          details: err.message
+      });
+      return
+  }
+});
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {

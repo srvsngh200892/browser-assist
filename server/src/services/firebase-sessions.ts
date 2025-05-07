@@ -22,6 +22,7 @@ export interface SessionMetadata {
     createdAt: FirebaseFirestore.Timestamp;
     lastActive: FirebaseFirestore.Timestamp;
     status: 'active' | 'inactive' | 'expired';
+    messageProcessing: boolean
     metadata?: Record<string, any>;
 }
 
@@ -51,6 +52,7 @@ export async function createSession(
             createdAt: FieldValue.serverTimestamp() as any,
             lastActive: FieldValue.serverTimestamp() as any,
             status: 'active',
+            messageProcessing: false,
             metadata,
         };
 

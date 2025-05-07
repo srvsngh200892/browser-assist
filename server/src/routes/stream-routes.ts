@@ -1,9 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
 import { getSessionMetadata } from '../services/firebase-sessions';
-import { MessageHandler } from '../services/messages';
 import { getMcpClient } from '../utils/client';
-import sessionStore from '../services/session-store';
 import {
     getStreamState,
     setStreamState,
@@ -36,6 +34,16 @@ router.post("/stream-disconnect", authMiddleware, async (req: AuthenticatedReque
     try {
         const { sessionId } = req.body;
 
+
+        // Get session metadata from Firebase
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+            return res.status(404).json({
+                success: false,
+                error: "Session not found"
+            });
+        }
+
         if (sessionId) {
             // Remove the session's stream state from Firebase
             await clearStreamState(sessionId);
@@ -60,6 +68,16 @@ router.get("/screenshot", authMiddleware, async (req: AuthenticatedRequest, res:
     try {
         // Get the sessionId from the query parameter
         const sessionId = req.query.sessionId?.toString() || "global";
+
+
+        // Get session metadata from Firebase
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+            return res.status(404).json({
+                success: false,
+                error: "Session not found"
+            });
+        }
 
         let screenshot;
         let mimeType = 'image/png';
@@ -142,6 +160,19 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     if (!sessionId) {
         return res.status(400).send("Session ID is required");
     }
+
+    const intervalId = setInterval(async() => {
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+          console.log('clossing the stream as no session id found')
+          res.write(`event: end\ndata: session ended\n\n`);
+          res.end();
+          clearInterval(intervalId);
+          return;
+        }
+        res.write(`data: ${JSON.stringify({ timestamp: new Date() })}\n\n`);
+      }, 30000);
+
     // Set headers for SSE
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -186,12 +217,10 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
     };
 
     // Store stream state in Firebase
-    setStreamState(sessionId, {
+    await setStreamState(sessionId, {
         active: true,
         lastScreenshotAt: Date.now()
-    }).catch(error => {
-        console.error(`Failed to initialize stream state: ${error instanceof Error ? error.message : "Unknown error"}`);
-    });
+    })
 
     // Function to take and send screenshots
     let errorCount = 0;
@@ -347,6 +376,7 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
 
     // Handle client disconnection
     req.on("close", async () => {
+        clearInterval(intervalId)
         isStreamConnected = false;
 
         if (screenshotInterval) {
@@ -369,27 +399,6 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
             console.error(`Failed to update stream state: ${e instanceof Error ? e.message : "Unknown error"}`);
         }
     });
-
-    // Set a maximum duration for the stream
-    setTimeout(() => {
-        if (isStreamConnected) {
-            isStreamConnected = false;
-
-            if (screenshotInterval) {
-                clearInterval(screenshotInterval);
-            }
-
-            const closeMsg = `event: status\ndata: {"type":"timeout","message":"Maximum stream duration reached"}\n\n`;
-            safeSend(closeMsg, "stream timeout");
-
-            res.end();
-
-            // Clear the stream state in Firebase
-            clearStreamState(sessionId).catch(error => {
-                console.error(`Failed to clear stream state: ${error instanceof Error ? error.message : "Unknown error"}`);
-            });
-        }
-    }, 30 * 60 * 1000); // 30 minute maximum
 });
 
 // Stream control endpoint (pause/resume)
@@ -404,6 +413,14 @@ router.post("/stream-control", authMiddleware, async (req: AuthenticatedRequest,
             });
         }
 
+        // Get session metadata from Firebase
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+            return res.status(404).json({
+                success: false,
+                error: "Session not found"
+            });
+        }
         // Update the stream state in Firebase based on the action
         let success = false;
         if (action === 'pause') {
