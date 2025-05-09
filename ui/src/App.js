@@ -1917,6 +1917,25 @@ function App() {
         }
     }, [messages]);
 
+
+    // Add error and close handlers to your stream
+    useEffect(() => {
+        console.log('i m here', loading, streamStatus)
+       if(!loading && sessionId && streamStatus === 'active') {
+            try {
+            api.post(`/api/stream-control`, {
+                sessionId: sessionId,
+                action: 'pause',
+                reason: 'response_complete'
+            }).catch(err => console.log('Server may not support stream pausing yet'));
+            console.log('POLL: Pausing stream since response is complete');
+            setStreamStatus('waiting');
+            } catch (err) {
+                console.error('Error in stream pause notification:', err);
+            }
+       }
+    }, [sessionId, loading, streamStatus]);
+
     // Add function to periodically clean up duplicate messages
     // useEffect(() => {
     //     // Skip if we don't have enough messages to deduplicate
