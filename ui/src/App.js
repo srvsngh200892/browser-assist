@@ -1920,7 +1920,6 @@ function App() {
 
     // Add error and close handlers to your stream
     useEffect(() => {
-        console.log('i m here', loading, streamStatus)
        if(!loading && sessionId && streamStatus === 'active') {
             try {
             api.post(`/api/stream-control`, {
