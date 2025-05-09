@@ -155,7 +155,7 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         await updateSessionActivity(sessionId);
 
         // Get or create message handler for this session
-        const messageHandler = await getMessageHandler(sessionId);
+        const messageHandler = await getMessageHandler(sessionId, true);
 
         const { userMessage } = req.body;
 

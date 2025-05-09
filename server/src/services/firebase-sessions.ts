@@ -281,10 +281,11 @@ export async function createMessageHandler(sessionId: string): Promise<MessageHa
     return messageHandler;
 }
 
-export async function getMessageHandler(sessionId: string): Promise<MessageHandler> {
+export async function getMessageHandler(sessionId: string, fromSever=true): Promise<MessageHandler> {
     console.log(`Getting message handler for session: ${sessionId}`);
     let messageHandler = sessionStore.getMessageHandler(sessionId);
     if (messageHandler) {
+        await messageHandler.updateFromStorage()
         return messageHandler;
     } else {
         console.log(`No message Handler found, creating new: ${sessionId}`);
