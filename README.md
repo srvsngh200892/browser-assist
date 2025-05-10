@@ -45,7 +45,7 @@ The project consists of several components:
 
 ## Getting Started
 
-### Environment Setup
+### Environment Development Setup
 
 1. Clone the repository:
 

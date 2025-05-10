@@ -9,6 +9,18 @@ interface AuthRequest extends Request {
     user?: any;
 }
 
+function sendSSEAuthError(res: Response) {
+    console.log(`closing stream because of auth error`);
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+    });
+    res.write(`event: auth_error\n`);
+    res.write(`data: {"code":401,"message":"Unauthorized"}\n\n`);
+    res.end();
+}
+
 export async function authMiddleware(
     req: AuthRequest,
     res: Response,
@@ -19,6 +31,9 @@ export async function authMiddleware(
         const token = req.cookies?.token;
 
         if (!token) {
+            if (req.headers.accept === 'text/event-stream') {
+                return sendSSEAuthError(res);
+            }
             return res.status(401).json({
                 success: false,
                 error: "Authentication token missing",
@@ -28,21 +43,27 @@ export async function authMiddleware(
 
         try {
             const decoded = await verifyToken(token, JWT_SECRET);
-            const user = await getUserById(decoded.userId);
+            if (req.headers.accept !== 'text/event-stream')  {
+                const user = await getUserById(decoded.userId);
 
-            if (!user) {
-                return res.status(401).json({
-                    success: false,
-                    error: "Invalid user"
-                });
+                if (!user) {
+                    return res.status(401).json({
+                        success: false,
+                        error: "Invalid user"
+                    });
+                }
+
+                req.user = user;
             }
 
-            req.user = user;
             next();
         } catch (jwtError) {
             console.error("JWT verification error:", jwtError);
             const errorMessage = jwtError instanceof Error ? jwtError.message : "Invalid token";
             const errorCode = jwtError instanceof jwt.TokenExpiredError ? 'token_expired' : 'invalid_token'
+            if (req.headers.accept === 'text/event-stream') {
+                return sendSSEAuthError(res);
+            }
             return res.status(401).json({
                 success: false,
                 error: errorMessage,

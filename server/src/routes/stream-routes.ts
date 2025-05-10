@@ -154,15 +154,16 @@ router.get("/screenshot", authMiddleware, async (req: AuthenticatedRequest, res:
 });
 
 // Add endpoint for browser stream
-router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => {
+router.get("/browser-stream/:sessionId", authMiddleware, async (req: Request, res: Response) => {
     const { sessionId } = req.params;
-
-    if (!sessionId) {
-        return res.status(400).send("Session ID is required");
+    const sessionData = await getSessionMetadata(sessionId);
+    if (!sessionData) {
+        console.log('clossing the stream as no session id found')
+        res.write(`event: end\ndata: session ended\n\n`);
+        return res.status(401).end();
     }
 
     const intervalId = setInterval(async() => {
-        const sessionData = await getSessionMetadata(sessionId);
         if (!sessionData) {
           console.log('clossing the stream as no session id found')
           res.write(`event: end\ndata: session ended\n\n`);
@@ -173,6 +174,7 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
         res.write(`data: ${JSON.stringify({ timestamp: new Date() })}\n\n`);
       }, 30000);
 
+    console.log(`creating new stream for session ${sessionId}`)
     // Set headers for SSE
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -376,6 +378,7 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
 
     // Handle client disconnection
     req.on("close", async () => {
+        console.log(`closing steam for session ${sessionId}`)
         clearInterval(intervalId)
         isStreamConnected = false;
 
@@ -395,6 +398,8 @@ router.get("/browser-stream/:sessionId", async (req: Request, res: Response) => 
                 pauseReason: 'stream_disconnected',
                 pausedAt: Date.now()
             });
+            res.end();
+            console.log(`closed steam for session ${sessionId}`)
         } catch (e) {
             console.error(`Failed to update stream state: ${e instanceof Error ? e.message : "Unknown error"}`);
         }
