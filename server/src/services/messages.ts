@@ -76,11 +76,10 @@ class MessageHandler {
     }
 
     public async updateFromStorage(): Promise<void> {
-        if (this.messages.length <= 1 && this.messages[0] && this.messages[0].role == 'system') {
-            const messages = await getSessionMessages(this.sessionId);
-            if (messages && messages.length > 1 ) {
-                this.messages = messages
-            }
+        const messages = await getSessionMessages(this.sessionId);
+        console.log(`fetching messages ${messages.length} from sever for session id ${this.sessionId}`)
+        if (messages && messages.length > 1 ) {
+            this.messages = messages
         }
     }
 

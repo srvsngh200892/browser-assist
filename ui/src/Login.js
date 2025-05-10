@@ -160,6 +160,7 @@ function Login({ onLoginSuccess }) {
         setError('');
         setSuccess('');
         setLoading(true);
+        localStorage.clear();
 
         try {
             const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
