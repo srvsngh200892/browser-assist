@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Login.css';
 import api from '../api'
+import { ENDPOINTS } from '../constants';
 
 function Login({ onLoginSuccess }) {
     const [isLogin, setIsLogin] = useState(true);
@@ -163,7 +164,7 @@ function Login({ onLoginSuccess }) {
         localStorage.clear();
 
         try {
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+            const endpoint = isLogin ? ENDPOINTS.LOGIN : ENDPOINTS.REGISTER;
             const payload = isLogin
                 ? { email: formData.email, password: formData.password }
                 : { username: formData.username, email: formData.email, password: formData.password };

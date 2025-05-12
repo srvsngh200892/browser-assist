@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ENDPOINTS } from '../constants';
 import api from '../api';
 
 export const useScreenshotAvailability = (sessionId) => {
@@ -8,7 +9,7 @@ export const useScreenshotAvailability = (sessionId) => {
   const checkScreenshotAvailability = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const response = await api.get(`api/validation/status/${sessionId}`);
+      const response = await api.get(ENDPOINTS.VALIDATION_STATUS(sessionId));
       if (response.data.success) {
         const hasScreens = response.data.hasScreenshots || false;
         const count = response.data.screenshotCount || 0;

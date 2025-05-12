@@ -1,0 +1,26 @@
+export const API_BASE_URL = '/api';
+
+export const ENDPOINTS = {
+  LOGIN: `${API_BASE_URL}/login`,
+  LOGOUT: `${API_BASE_URL}/logout`,
+  AUTH_CHECK: `${API_BASE_URL}/auth-check`,
+  PING: `${API_BASE_URL}/ping`,
+  REFRESH: `${API_BASE_URL}/refresh`,
+  SESSION: `${API_BASE_URL}/session`,
+  LOGOUT: `${API_BASE_URL}/logout`,
+  LOGIN: `${API_BASE_URL}/auth/login`,
+  REGISTER: `${API_BASE_URL}/auth/register`,
+  AUTH_CHECK: `${API_BASE_URL}/auth-check`,
+  GET_SCREENSHOTS: `${API_BASE_URL}/screenshot`,
+  CHECK_HEALTH:  `${API_BASE_URL}/health`,
+  STREAM_DISCONNECT: `${API_BASE_URL}/stream-disconnect`,
+  STREAM_CONTROL: `${API_BASE_URL}/stream-control`,
+  DOWNLOAD_VALIDATION_REPORT: `${API_BASE_URL}/validation/download-from-storage`,
+  GET_STREAM: (sessionId) => `${API_BASE_URL}/browser-stream/${sessionId}`,
+  GET_MESSAGE: (sessionId) => `${API_BASE_URL}/messages/${sessionId}`,
+  GET_SESSION: (sessionId) => `${API_BASE_URL}/session/${sessionId}`,
+  SEND_MESSAGE: (sessionId) => `${API_BASE_URL}/chat/${sessionId}`,
+  VALIDATION_STATUS: (sessionId) => `${API_BASE_URL}/validation/status/${sessionId}`,
+  GET_VALIDATION_STATUS: (sessionId) => `${API_BASE_URL}/validation/report/${sessionId}/status`,
+  GENERATE_VALIDATION_REPORT: (sessionId) => `${API_BASE_URL}/validation/report/${sessionId}/generate`,
+};

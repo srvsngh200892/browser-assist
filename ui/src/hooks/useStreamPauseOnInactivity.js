@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import api from '../api';
+import { ENDPOINTS } from '../constants';
 
 export const useStreamPauseOnInactivity = (loading, sessionId, streamStatus, setStreamStatus) => {
   useEffect(() => {
     if (!loading && sessionId && streamStatus === 'active') {
       try {
-        api.post(`/api/stream-control`, {
+        api.post(ENDPOINTS.STREAM_CONTROL, {
           sessionId: sessionId,
           action: 'pause',
           reason: 'response_complete'
