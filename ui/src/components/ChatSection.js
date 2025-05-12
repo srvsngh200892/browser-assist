@@ -68,6 +68,7 @@ function ChatSection({
                             showTechnicalMessages={showTechnicalMessages}
                         />
                     ))}
+                <ScrollToBottomButton showScrollButton={showScrollButton} scrollToBottom={scrollToBottom}/>
                 <div ref={messagesEndRef} />
             </div>
             <div className="input-container">
@@ -107,7 +108,6 @@ function ChatSection({
                     aria-label="Send message"
                 >
                 </button>
-                <ScrollToBottomButton showScrollButton={showScrollButton} scrollToBottom={scrollToBottom}/>
             </div>
         </div>
     );
