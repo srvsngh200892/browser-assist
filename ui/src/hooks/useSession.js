@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-export const useSession = () => {
-    const [sessionId, setSessionId] = useState(null);
+export const useSession = (sessionId) => {
     const sessionIdRef = useRef(null);
     const [error, setError] = useState(null);
     const [reusingSession, setReusingSession] = useState(false); // Add state for session reuse
@@ -11,8 +10,6 @@ export const useSession = () => {
     }, [sessionId]);
 
     return {
-        sessionId,
-        setSessionId,
         sessionIdRef,
         setError,
         setReusingSession

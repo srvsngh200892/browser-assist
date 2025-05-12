@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Header({ togglePreview, previewVisible, pingServer, user, logout }) {
+function Header({ togglePreview, previewVisible, pingServer, user, handleLogout }) {
     return (
       <header className="app-header">
         <h1>🤖 Browse Assist</h1>
@@ -11,16 +11,16 @@ function Header({ togglePreview, previewVisible, pingServer, user, logout }) {
           >
             {previewVisible ? 'Hide Preview' : 'Show Preview'}
           </button>
-          <button
+          {/* <button
             className="ping-button"
             onClick={pingServer}
           >
             Ping Server
-          </button>
+          </button> */}
           <div className="user-avatar-container">
             <button
               className="logout-button"
-              onClick={logout}
+              onClick={handleLogout}
               style={{
                 display: 'flex',
                 alignItems: 'center',

@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import React, { useState, useRef, useCallback } from 'react';
 import './App.css';
 import Header from './components/Header'; // Import the SessionInfo component
 import SessionInfo from './components/SessionInfo'; // Import the SessionInfo component
 import Login from './components/Login'; // Import the Login component
 import ChatSection from './components/ChatSection';
 import PreviewSection from './components/PreviewSection';
-import api from './api'
+import { useAuth } from './hooks/useAuth';
 import { useInitialMessages } from './hooks/useInitialMessages';
 import { useScreenshotAvailability } from './hooks/useScreenshotAvailability';
 import { useSessionInitialization } from './hooks/useSessionInitialization';
@@ -38,9 +37,14 @@ const WELCOME_MESSAGE = [
  * OpenAI MCP Client
  */
 function App() {
-    // Refs for tracking state and timeouts
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [user, setUser] = useState(null);
+    const {
+        isAuthenticated,
+        user,
+        sessionId,
+        setSessionId,
+        handleLoginSuccess,
+        handleLogout,
+      } = useAuth();
         
 
     const [browserImage, setBrowserImage] = useState(PLACEHOLDER_IMAGE); // For storing the browser preview image
@@ -75,7 +79,7 @@ function App() {
         });
     }, []);
 
-    const { sessionId, setSessionId, sessionIdRef, setError, setReusingSession } = useSession(addStatusMessage)
+    const { sessionIdRef, setError, setReusingSession } = useSession(sessionId)
     const { streamSourceRef, streaming, streamStatus, setStreamStatus, cleanupStream, stopStream, pingServer, restartStream, startStream, reconnectToStream, resumeStream } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
     const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
         //Toggle Function
@@ -111,80 +115,6 @@ function App() {
     //Scroll Button State
     useScrollButtonState(chatContainerRef, messages, messagesEndRef, userScrolledAwayRef, setShowScrollButton);
 
-    const handleLogout = useCallback((deleteData = true) => {
-        const currentSessionId = sessionIdRef.current;
-        if (currentSessionId) {
-            try {
-                cleanupStream();
-                api.post(`/api/logout`, {
-                    sessionId: currentSessionId,
-                    deleteData: !!deleteData
-                }, {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => {
-                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
-                    cleanupStream();
-                    localStorage.clear();
-                    // Reset app state
-                    setUser(null);
-                    setMessages(WELCOME_MESSAGE);
-                    setBrowserImage(PLACEHOLDER_IMAGE);
-                    setLoading(false);
-                    setIsAuthenticated(false);
-                    setSessionId(null);
-    
-                    // ✅ Now reload after everything is cleaned up
-                    setTimeout(() => {
-                        window.location.href = window.location.origin; // more reliable than reload()
-                    }, 50);
-                }).catch(error => {
-                    console.error(`Logout error: ${error}`);
-                    throw error;
-                });
-            } catch (error) {
-                console.error('Error during logout process:', error.message || 'Unknown error');
-                throw error;
-            }
-        }
-    }, [cleanupStream]);
-
-
-    useEffect(() => {
-        const fetchAuthenticationStatus = async () => {
-            try {
-            const response = await api.get(`/api/auth-check`);
-            const { isAuthenticated, user } = response.data;
-            setIsAuthenticated(isAuthenticated);
-            if (isAuthenticated) {
-                setUser(user);
-            }
-            } catch (error) {
-            console.error('Error checking authentication:', error);
-            handleLogout();
-            }
-        };
-
-        fetchAuthenticationStatus();
-    }, [handleLogout]);
-
-    /**
-     * Authentication helper functions
-     */
-    const handleLoginSuccess = useCallback((userData) => {
-        setUser(userData);
-        setIsAuthenticated(true);
-
-        // Immediately set session ID from localStorage after login
-        const loginSessionId = localStorage.getItem('session_id');
-        if (loginSessionId) {
-            console.log('LOGIN DEBUG: Setting session ID immediately after login:', loginSessionId);
-            setSessionId(loginSessionId);
-        } else {
-            console.warn('LOGIN DEBUG: No session ID found in localStorage after login');
-        }
-    }, [setSessionId]);
  
     return (
         <div className="app-container">
@@ -197,7 +127,7 @@ function App() {
                         previewVisible={previewVisible}
                         pingServer={pingServer}
                         user={user} // Pass user as prop
-                        logout={handleLogout} // Pass logout as prop
+                        handleLogout={handleLogout} // Pass logout as prop
                     />
                     {sessionId && <SessionInfo sessionId={sessionId} />}
                     <main className="main-content">

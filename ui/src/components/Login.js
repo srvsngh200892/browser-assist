@@ -186,7 +186,7 @@ function Login({ onLoginSuccess }) {
                 // Slight delay before redirecting for better UX
                 setTimeout(() => {
                     // Notify parent component
-                    onLoginSuccess(response.data.user);
+                    onLoginSuccess(response.data.user, response.data.sessionId);
                 }, 1000);
             } else {
                 setError(response.data.error || 'Authentication failed');
@@ -287,11 +287,11 @@ function Login({ onLoginSuccess }) {
                         {validationErrors.password && touched.password && (
                             <div className="field-error">{validationErrors.password}</div>
                         )}
-                        {isLogin && (
+                        {/* {isLogin && (
                             <div className="forgot-password">
                                 <a href="#reset-password">Forgot password?</a>
                             </div>
-                        )}
+                        )} */}
                     </div>
 
                     {!isLogin && (
