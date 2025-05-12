@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ENDPOINTS } from './constants';
+import { ENDPOINTS } from '../constants';
 
 const api = axios.create({
   baseURL:  process.env.REACT_APP_SERVER_URL, // adjust as needed
