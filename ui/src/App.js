@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
-import SessionInfo from './SessionInfo'; // Import the SessionInfo component
-import Login from './Login'; // Import the Login component
-import ValidationReport from './ValidationReport'; // Import the ValidationReport component
+import Header from './components/Header'; // Import the SessionInfo component
+import SessionInfo from './components/SessionInfo'; // Import the SessionInfo component
+import Login from './components/Login'; // Import the Login component
+import ChatSection from './components/ChatSection';
+import PreviewSection from './components/PreviewSection';
 import api from './api'
 
 // Server URL for backend
@@ -12,10 +14,6 @@ const SERVER_URL = process.env.REACT_APP_SERVER_URL
 // Placeholder image for browser preview
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiAvPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCwzMDApIj4KICAgIDx0ZXh0IHg9IjAiIHk9Ii02MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmaWxsPSIjNmI0NmMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgQnJvd3NlciBQcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSItMTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzZjNzU3ZCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+CiAgICAgIE5vIGxpdmUgcHJldmlldyBhdmFpbGFibGUKICAgIDwvdGV4dD4KICAgIDx0ZXh0IHg9IjAiIHk9IjIwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICBDbGljayAiU3RhcnQgU3RyZWFtIiB0byBlbmFibGUgbGl2ZSBwcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgb3IgIlJlZnJlc2ggU2NyZWVuc2hvdCIgdG8gdGFrZSBhIHNpbmdsZSBzY3JlZW5zaG90CiAgICA8L3RleHQ+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCw1MDApIj4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmI0NmMxIiBzdHJva2Utd2lkdGg9IjIiIC8+CiAgICA8dGV4dCB4PSIwIiB5PSI2IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2YjQ2YzEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICA/CiAgICA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4=';
 
-// Defaults for the app
-const POLL_INTERVAL = 10000; // Poll every 10 seconds - increased from 5s to 10s
-// Add a debounce mechanism for API calls
-const DEBOUNCE_DELAY = 1000; // 1 second debounce delay
 // Add session creation retry constants
 const SESSION_RETRY_KEY = 'session-creation-retry-count';
 const SESSION_RETRY_TIMESTAMP_KEY = 'session-creation-last-attempt';
@@ -44,7 +42,6 @@ function App() {
     // Core state
     const [sessionId, setSessionId] = useState(null);
     const [messages, setMessages] = useState(WELCOME_MESSAGE);
-    const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [streamingContent, setStreamingContent] = useState(''); // For storing partial responses
@@ -67,7 +64,6 @@ function App() {
         time: new Date().toLocaleTimeString()
     }]);
     const [showTechnicalMessages, setShowTechnicalMessages] = useState(false);
-    const [rateLimited, setRateLimited] = useState(false); // Add state for rate limiting
     const [reusingSession, setReusingSession] = useState(false); // Add state for session reuse
 
     // Refs for tracking state and timeouts
@@ -81,7 +77,6 @@ function App() {
     const chatContainerRef = useRef(null);
     const inputRef = useRef(null); // Reference to input field for focusing
     const [showScrollButton, setShowScrollButton] = useState(false);
-    const [scrollButtonPosition, setScrollButtonPosition] = useState(typeof window !== 'undefined' ? window.innerHeight - 70 : 0); // Position from top
 
     // Constants
     const LOCAL_POLL_INTERVAL = 10000; // Using a local variable to avoid naming conflict
@@ -132,41 +127,41 @@ function App() {
     const handleLogout = useCallback((deleteData = true) => {
         const currentSessionId = sessionIdRef.current;
         if (currentSessionId) {
-          try {
-            cleanupStream();
-            api.post(`/api/logout`, {
-              sessionId: currentSessionId,
-              deleteData: !!deleteData
-            }, {
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }).then(() => {
-              console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
-              cleanupStream();
-              localStorage.clear();
-              // Reset app state
-              setUser(null);
-              setMessages(WELCOME_MESSAGE);
-              setBrowserImage(PLACEHOLDER_IMAGE);
-              setLoading(false);
-              setIsAuthenticated(false);
-              setSessionId(null);
-      
-              // ✅ Now reload after everything is cleaned up
-              setTimeout(() => {
-                window.location.href = window.location.origin; // more reliable than reload()
-              }, 50);
-            }).catch(error => {
-              console.error(`Logout error: ${error}`);
-              throw error;
-            });
-          } catch (error) {
-            console.error('Error during logout process:', error.message || 'Unknown error');
-            throw error;
-          }
+            try {
+                cleanupStream();
+                api.post(`/api/logout`, {
+                    sessionId: currentSessionId,
+                    deleteData: !!deleteData
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => {
+                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
+                    cleanupStream();
+                    localStorage.clear();
+                    // Reset app state
+                    setUser(null);
+                    setMessages(WELCOME_MESSAGE);
+                    setBrowserImage(PLACEHOLDER_IMAGE);
+                    setLoading(false);
+                    setIsAuthenticated(false);
+                    setSessionId(null);
+
+                    // ✅ Now reload after everything is cleaned up
+                    setTimeout(() => {
+                        window.location.href = window.location.origin; // more reliable than reload()
+                    }, 50);
+                }).catch(error => {
+                    console.error(`Logout error: ${error}`);
+                    throw error;
+                });
+            } catch (error) {
+                console.error('Error during logout process:', error.message || 'Unknown error');
+                throw error;
+            }
         }
-      }, [cleanupStream]);
+    }, [cleanupStream]);
 
     useEffect(() => {
         const fetchAuthenticationStatus = async () => {
@@ -309,19 +304,6 @@ function App() {
             const newMessages = [...prev, { type, text, time: timeString }];
             return newMessages.length > 10 ? newMessages.slice(-10) : newMessages;
         });
-
-        // Set the rate limited state if we detect a rate limit message
-        if (type === 'error' && (
-            text.includes('Rate limited') ||
-            text.includes('Too many requests') ||
-            text.includes('Too many session')
-        )) {
-            setRateLimited(true);
-            // Auto-clear after 60 seconds
-            setTimeout(() => {
-                setRateLimited(false);
-            }, 60000);
-        }
     }, []);
 
     /**
@@ -1021,42 +1003,7 @@ function App() {
             }
         } catch (err) {
             console.error('SESSION EXPIRED: Error creating new session:', err);
-
-            // Handle rate limiting with special message
-            if (err.response && err.response.status === 429) {
-                setError('Too many requests. Please wait a moment before trying again.');
-                addStatusMessage('error', 'Rate limited when creating session. Please wait a moment.');
-
-                // Set the rate limited state
-                setRateLimited(true);
-                // Auto-clear after a delay
-                setTimeout(() => {
-                    setRateLimited(false);
-                }, 60000);
-
-                // Try to use a cached session as fallback
-                try {
-                    const cachedSession = localStorage.getItem(SESSION_CACHE_KEY);
-                    if (cachedSession) {
-                        console.log('SESSION EXPIRED: Attempting to use cached session after rate limit:', cachedSession);
-
-                        // Verify the cached session
-                        const verifyResponse = await api.get(`/api/health?sessionId=${cachedSession}`)
-                            .catch(e => null);
-
-                        if (verifyResponse && verifyResponse.data && verifyResponse.data.success) {
-                            console.log('SESSION EXPIRED: Cached session is valid, using it');
-                            setSessionId(cachedSession);
-                            addStatusMessage('info', 'Using previous session due to rate limiting');
-                            setError('Using previous session. Please try again.');
-                        }
-                    }
-                } catch (cacheErr) {
-                    console.error('SESSION EXPIRED: Error using cached session:', cacheErr);
-                }
-            } else {
-                setError(`Failed to create new session: ${err.message}`);
-            }
+            setError(`Failed to create new session: ${err.message}`);
         } finally {
             // Clear flag after delay
             setTimeout(() => {
@@ -1081,7 +1028,7 @@ function App() {
         // Clean up any existing stream first
         cleanupStream();
 
-            // Only reset retry flag if this is a manual/new stream start
+        // Only reset retry flag if this is a manual/new stream start
         if (!options.isRetry) {
             refreshAttemptedRef.current = false;
         }
@@ -1204,25 +1151,25 @@ function App() {
                 source.addEventListener('auth_error', async (event) => {
                     const data = JSON.parse(event.data || '{}');
                     if (data.code === 401 && !refreshAttemptedRef.current) {
-                      refreshAttemptedRef.current = true;
-                      let refreshed = false;
-                      try {
-                        await api.post('/api/refresh');
-                        refreshed = true;
-                      } catch(err) {
-                        console.log('error getting token from refresh token', err)
-                        refreshed = false;
-                      }
-                      if (refreshed) {
-                        setTimeout(() => {
-                            startStream({ isRetry: true });
-                          }, 1000);
-                      } else {
-                        console.error('Token refresh failed. Logging out or stopping stream.');
-                        setStreaming(false);
-                        setStreamStatus('unauthorized');
-                        source.close();
-                      }
+                        refreshAttemptedRef.current = true;
+                        let refreshed = false;
+                        try {
+                            await api.post('/api/refresh');
+                            refreshed = true;
+                        } catch (err) {
+                            console.log('error getting token from refresh token', err)
+                            refreshed = false;
+                        }
+                        if (refreshed) {
+                            setTimeout(() => {
+                                startStream({ isRetry: true });
+                            }, 1000);
+                        } else {
+                            console.error('Token refresh failed. Logging out or stopping stream.');
+                            setStreaming(false);
+                            setStreamStatus('unauthorized');
+                            source.close();
+                        }
                     }
                 });
 
@@ -1953,19 +1900,19 @@ function App() {
 
     // Add error and close handlers to your stream
     useEffect(() => {
-       if(!loading && sessionId && streamStatus === 'active') {
+        if (!loading && sessionId && streamStatus === 'active') {
             try {
-            api.post(`/api/stream-control`, {
-                sessionId: sessionId,
-                action: 'pause',
-                reason: 'response_complete'
-            }).catch(err => console.log('Server may not support stream pausing yet'));
-            console.log('POLL: Pausing stream since response is complete');
-            setStreamStatus('waiting');
+                api.post(`/api/stream-control`, {
+                    sessionId: sessionId,
+                    action: 'pause',
+                    reason: 'response_complete'
+                }).catch(err => console.log('Server may not support stream pausing yet'));
+                console.log('POLL: Pausing stream since response is complete');
+                setStreamStatus('waiting');
             } catch (err) {
                 console.error('Error in stream pause notification:', err);
             }
-       }
+        }
     }, [sessionId, loading, streamStatus]);
 
     // Add function to periodically clean up duplicate messages
@@ -2032,356 +1979,52 @@ function App() {
         }
     }, [previewVisible, streaming]);
 
-
-
     return (
         <div className="app-container">
             {!isAuthenticated ? (
                 <Login onLoginSuccess={handleLoginSuccess} />
             ) : (
                 <>
-                    <header className="app-header">
-                        <h1>🤖 Browse Assist</h1>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <button
-                                className="toggle-preview-button"
-                                onClick={togglePreview}
-                            >
-                                {previewVisible ? 'Hide Preview' : 'Show Preview'}
-                            </button>
-                            <button
-                                className="ping-button"
-                                onClick={pingServer}
-                            >
-                                Ping Server
-                            </button>
-
-                            {/* User avatar with logout - keep this as is */}
-                            <div className="user-avatar-container">
-                                <button
-                                    className="logout-button"
-                                    onClick={handleLogout}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '5px 12px 5px 5px',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                        border: 'none',
-                                        borderRadius: '20px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                    }}
-                                >
-                                    <div className="avatar-circle" style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '50%',
-                                        backgroundColor: 'white',
-                                        color: '#6b46c1',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontWeight: 'bold',
-                                        fontSize: '16px',
-                                        boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.3)',
-                                    }}>
-                                        {user?.email?.charAt(0)?.toUpperCase() || 'U'}
-                                    </div>
-                                    <span>Logout</span>
-                                </button>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* Add SessionInfo component */}
+                    <Header
+                        togglePreview={togglePreview}
+                        previewVisible={previewVisible}
+                        pingServer={pingServer}
+                        user={user} // Pass user as prop
+                        logout={handleLogout} // Pass logout as prop
+                    />
                     {sessionId && <SessionInfo sessionId={sessionId} />}
-
-
                     <main className="main-content">
-                        {/* Chat Section */}
-                        <div className="chat-section">
-                            <div className="chat-header">
-                                <h2>Chat</h2>
-                                <div className="chat-controls">
-                                    <button
-                                        className="toggle-technical-button"
-                                        onClick={toggleTechnicalMessages}
-                                    >
-                                        {showTechnicalMessages ? 'Hide Technical Details' : 'Show Technical Details'}
-                                    </button>
-
-                                    {/* Add ValidationReport only when screenshots are available */}
-                                    {!loading && hasScreenshots && sessionId && (
-                                        <ValidationReport
-                                            sessionId={sessionId}
-                                            onError={(msg) => addStatusMessage('error', msg)}
-                                            hasScreenshots={hasScreenshots}
-                                            screenshotCount={screenshotCount}
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="chat-container" ref={chatContainerRef}>
-                                {messages
-                                    .filter(message => {
-                                        // Regular Mode: Show only user-assistant conversation
-                                        if (!showTechnicalMessages) {
-                                            return message.role === 'user' ||
-                                                message.role === 'assistant' ||
-                                                message.is_welcome;
-                                        }
-                                        // Technical Mode: Show everything
-                                        return true;
-                                    })
-                                    .map((message, index) => {
-                                        // Check if this message is in typing state
-                                        const isTyping = message.role === 'assistant' &&
-                                            (message.is_typing === true ||
-                                                (typingMessageIds.includes(message.id) && !message.is_welcome));
-
-                                        // Determine the appropriate icon based on message role and content
-                                        let roleIcon = '⚙️'; // Default icon
-
-                                        if (message.role === 'assistant') {
-                                            roleIcon = '🤖'; // Robot face for assistant
-                                        } else if (message.role === 'user') {
-                                            roleIcon = '👤'; // User icon
-                                        } else if (message.role === 'function' || message.role === 'tool') {
-                                            // Tool-specific icons
-                                            if (message.tool_call_id && typeof message.content === 'string') {
-                                                if (message.content.includes('screenshot') || message.content.includes('image')) {
-                                                    roleIcon = '📷'; // Camera for screenshots
-                                                } else if (message.content.includes('click') || message.content.includes('button')) {
-                                                    roleIcon = '👆'; // Finger for clicks
-                                                } else if (message.content.includes('type') || message.content.includes('input')) {
-                                                    roleIcon = '⌨️'; // Keyboard for typing
-                                                } else if (message.content.includes('search') || message.content.includes('found')) {
-                                                    roleIcon = '🔎'; // Magnifying glass for search
-                                                } else if (message.content.includes('read') || message.content.includes('text')) {
-                                                    roleIcon = '📖'; // Book for reading
-                                                } else {
-                                                    roleIcon = '🔧'; // Default tool icon
-                                                }
-                                            } else {
-                                                roleIcon = '🔧'; // Default tool icon
-                                            }
-                                        } else if (message.role === 'system') {
-                                            roleIcon = '⚙️'; // Gear for system
-                                        }
-
-                                        return (
-                                            <div
-                                                key={message.id || `${message.role}-${index}`}
-                                                className={`message chat-bubble ${message.role} ${isTyping ? 'typing' : ''}`}
-                                            >
-                                                <div className="message-role">
-                                                    <div className="message-icon">
-                                                        {roleIcon}
-                                                    </div>
-                                                    {/* Update this line to ensure consistent capitalization and only show ID for non-user messages */}
-                                                    {message.role === 'user' ? 'User' : (
-                                                        <>
-                                                            {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
-                                                            {message.id && <span className="message-id"> (ID: {message.id.substring(0, 6)}...)</span>}
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                <div className="message-content">
-                                                    {isTyping ? (
-                                                        <div className="typing-message-container">
-                                                            <div className="typing-indicator">
-                                                                <div className="typing-dot"></div>
-                                                                <div className="typing-dot"></div>
-                                                                <div className="typing-dot"></div>
-                                                                <div className="typing-cursor"></div>
-                                                            </div>
-                                                        </div>
-                                                    ) : (message.role === 'function' || message.role === 'tool') ? (
-                                                        // Special formatting for tool/function responses
-                                                        <pre className="tool-content">
-                                                            {typeof message.content === 'string'
-                                                                ? message.content
-                                                                : JSON.stringify(message.content, null, 2)}
-                                                        </pre>
-                                                    ) : message.content ? (
-                                                        <div dangerouslySetInnerHTML={{ __html: message.content }} />
-                                                    ) : (
-                                                        // Display a placeholder for empty content
-                                                        <div className="empty-content">[Empty Message]</div>
-                                                    )}
-
-                                                    {/* Display finish_reason if available */}
-                                                    {message.role === 'assistant' && message.finish_reason && showTechnicalMessages && (
-                                                        <div className="message-finish-reason">
-                                                            Finish reason: {message.finish_reason}
-                                                        </div>
-                                                    )}
-                                                    {!isTyping && message.tool_calls && message.tool_calls.length > 0 && !typingMessageIds.includes(message.id) && (
-                                                        <div className="tool-calls">
-                                                            <div className="tool-call-header">🔧 Tool Calls:</div>
-                                                            {message.tool_calls.map((toolCall, idx) => {
-                                                                // Determine which icon to use based on the tool name
-                                                                let toolIcon = '🔧'; // Default tool icon
-
-                                                                // Set specific icons based on function name
-                                                                const toolName = toolCall.function?.name || '';
-                                                                if (toolName.includes('screenshot') || toolName.includes('snapshot')) {
-                                                                    toolIcon = '📷'; // Camera icon
-                                                                } else if (toolName.includes('click')) {
-                                                                    toolIcon = '👆'; // Click icon
-                                                                } else if (toolName.includes('type')) {
-                                                                    toolIcon = '⌨️'; // Keyboard icon
-                                                                } else if (toolName.includes('navigate')) {
-                                                                    toolIcon = '🔍'; // Navigation icon
-                                                                } else if (toolName.includes('read')) {
-                                                                    toolIcon = '📖'; // Reading icon
-                                                                } else if (toolName.includes('search')) {
-                                                                    toolIcon = '🔎'; // Search icon
-                                                                } else if (toolName.includes('wait')) {
-                                                                    toolIcon = '⏱️'; // Timer icon
-                                                                } else {
-                                                                    toolIcon = '🌐'; // Browser icon
-                                                                }
-
-                                                                return (
-                                                                    <div key={toolCall.id || idx} className="tool-call">
-                                                                        <div className="tool-name">
-                                                                            <span className="tool-icon">{toolIcon}</span>
-                                                                            {toolCall.function?.name || 'Unknown Tool'}
-                                                                        </div>
-                                                                        {toolCall.function?.arguments && (
-                                                                            <pre className="tool-args">{JSON.stringify(
-                                                                                // Safely parse JSON or return the original string if parsing fails
-                                                                                (() => {
-                                                                                    try {
-                                                                                        return JSON.parse(toolCall.function.arguments);
-                                                                                    } catch (e) {
-                                                                                        return toolCall.function.arguments;
-                                                                                    }
-                                                                                })(),
-                                                                                null, 2)}</pre>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-
-                                {/* Scroll button */}
-                                {/* {showScrollButton && (
-                                    <div className="scroll-button-wrapper">
-                                        <button
-                                            className="scroll-button"
-                                            onClick={scrollToBottom}
-                                        >
-                                            ↓
-                                        </button>
-                                    </div>
-                                )} */}
-
-                                {/* Invisible element to scroll to */}
-                                <div ref={messagesEndRef} />
-                            </div>
-
-                            <div className="input-container">
-                                <textarea
-                                    ref={inputRef}
-                                    className="message-input"
-                                    placeholder="Type your message..."
-                                    value={inputValue}
-                                    onChange={(e) => {
-                                        setInputValue(e.target.value);
-                                        e.target.style.height = 'auto';
-                                        e.target.style.height = `${e.target.scrollHeight}px`;
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey && !loading) {
-                                            e.preventDefault();
-                                            handleSendMessage(inputValue);
-                                            setInputValue('');
-                                            e.target.style.height = 'auto';
-                                        }
-                                    }}
-                                    disabled={loading}
-                                    rows={1}
-                                />
-                                <button
-                                    className={`send-button ${loading ? 'pulsing-button' : ''}`} // Add pulsing class when loading is true
-                                    onClick={() => {
-                                        handleSendMessage(inputValue);
-                                        setInputValue('');
-                                        requestAnimationFrame(() => {
-                                            if (inputRef.current) {
-                                              inputRef.current.style.height = 'auto';
-                                            }
-                                        });
-                                    }}
-                                    disabled={loading || !inputValue.trim()}
-                                    aria-label="Send message"
-                                >
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Preview Section */}
+                        <ChatSection
+                            messages={messages}
+                            loading={loading}
+                            showTechnicalMessages={showTechnicalMessages}
+                            sessionId={sessionId}
+                            hasScreenshots={hasScreenshots}
+                            screenshotCount={screenshotCount}
+                            addStatusMessage={addStatusMessage}
+                            handleSendMessage={handleSendMessage}
+                            toggleTechnicalMessages={toggleTechnicalMessages}
+                            typingMessageIds={typingMessageIds}
+                            messagesEndRef={messagesEndRef}
+                            chatContainerRef={chatContainerRef}
+                            inputRef={inputRef}
+                            showScrollButton={showScrollButton}
+                            scrollToBottom={scrollToBottom}
+                            handleChatScroll={handleChatScroll}
+                        />
                         {previewVisible && (
-                            <div className="preview-section">
-                                <div className="preview-title">
-                                    <h2>Live Preview</h2>
-                                    <div className="preview-controls">
-                                        <button
-                                            className="refresh-preview-button"
-                                            onClick={takeScreenshot}
-                                            disabled={!sessionId || streaming}
-                                        >
-                                            Refresh Screenshot
-                                        </button>
-                                        <button
-                                            className={`stream-button ${!streaming ? 'start' : streaming ? 'stop' : 'restart'}`}
-                                            onClick={!streaming ? startStream : streaming ? stopStream : restartStream}
-                                            disabled={!sessionId || streamStatus === 'connecting'}
-                                        >
-                                            {!streaming ? 'Start Stream' : streaming ? 'Stop Stream' : 'Restart Stream'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={`stream-status ${streamStatus} ${(streamStatus === 'active' || streamStatus === 'waiting') ? 'pulsing' : ''}`}>
-                                    Stream Status: {streamStatus.charAt(0).toUpperCase() + streamStatus.slice(1)}
-                                </div>
-
-                                <div className="browser-preview">
-                                    <img src={browserImage} alt="Browser Preview" />
-                                </div>
-
-                                {/* Status log */}
-                                <div className="status-log">
-                                    <h3>Status Log</h3>
-                                    <div className="status-messages">
-                                        {statusMessages.length === 0 ? (
-                                            <div className="status-message info">
-                                                <span className="status-time">--:--:--</span>
-                                                <span className="status-text">Waiting for activity...</span>
-                                            </div>
-                                        ) : (
-                                            statusMessages.map((status, index) => (
-                                                <div key={index} className={`status-message ${status.type}`}>
-                                                    <span className="status-time">{status.time}</span>
-                                                    <span className="status-text">{status.text}</span>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+                            <PreviewSection
+                                previewVisible={previewVisible}
+                                browserImage={browserImage}
+                                streaming={streaming}
+                                streamStatus={streamStatus}
+                                sessionId={sessionId}
+                                takeScreenshot={takeScreenshot}
+                                startStream={startStream}
+                                stopStream={stopStream}
+                                restartStream={restartStream}
+                                statusMessages={statusMessages}
+                            />
                         )}
                     </main>
                 </>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './SessionInfo.css';
-import api from './api'
+import api from '../api'
 
 /**
  * Session Information Component

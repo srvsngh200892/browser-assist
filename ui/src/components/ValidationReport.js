@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from './api'
+import api from '../api'
 import './ValidationReport.css';
-
-// Server URL for backend
-const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'https://localhost';
 
 /**
  * ValidationReport Component - Compact version for chat header
