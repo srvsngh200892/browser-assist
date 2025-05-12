@@ -312,7 +312,7 @@ router.post('/refresh', async (req: any, res: Response) => {
     }
 
     try {
-      const decoded = await verifyToken(refreshToken, JWT_SECRET);;
+      const decoded = await verifyToken(refreshToken, JWT_REFRESH_SECRET);;
       const user = await getUserById(decoded.userId);
 
       if (!user) {
@@ -336,7 +336,7 @@ router.post('/refresh', async (req: any, res: Response) => {
         httpOnly: true, // Prevents access via JavaScript
         secure: true, // Use HTTPS in production
         sameSite: 'strict', // Prevents cross-site request forgery
-        maxAge: 2000
+        maxAge: 7200 * 1000
       });
 
       res.cookie('refresh_token', newRefreshToken, {

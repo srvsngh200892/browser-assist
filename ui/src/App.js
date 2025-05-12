@@ -95,6 +95,8 @@ function App() {
     // Add a ref to track if user has manually scrolled away from bottom
     const userScrolledAwayRef = useRef(false);
 
+    const refreshAttemptedRef = useRef(false);
+
 
     /**
      * Basic stream cleanup (separate from full stopStream)
@@ -1079,6 +1081,11 @@ function App() {
         // Clean up any existing stream first
         cleanupStream();
 
+            // Only reset retry flag if this is a manual/new stream start
+        if (!options.isRetry) {
+            refreshAttemptedRef.current = false;
+        }
+
         // Set streaming to true immediately for better visual feedback
         setStreaming(true);
         setStreamStatus('connecting');
@@ -1185,6 +1192,8 @@ function App() {
                         }
                         setStreaming(false);
                         setStreamStatus('error');
+                        source.close();
+
                         // Try fallback polling
                         tryPollingFallback();
                     } else {
@@ -1192,6 +1201,30 @@ function App() {
                         addStatusMessage('warning', 'Stream connection error - will try to continue');
                     }
                 };
+                source.addEventListener('auth_error', async (event) => {
+                    const data = JSON.parse(event.data || '{}');
+                    if (data.code === 401 && !refreshAttemptedRef.current) {
+                      refreshAttemptedRef.current = true;
+                      let refreshed = false;
+                      try {
+                        await api.post('/api/refresh');
+                        refreshed = true;
+                      } catch(err) {
+                        console.log('error getting token from refresh token', err)
+                        refreshed = false;
+                      }
+                      if (refreshed) {
+                        setTimeout(() => {
+                            startStream({ isRetry: true });
+                          }, 1000);
+                      } else {
+                        console.error('Token refresh failed. Logging out or stopping stream.');
+                        setStreaming(false);
+                        setStreamStatus('unauthorized');
+                        source.close();
+                      }
+                    }
+                });
 
                 // Store reference for cleanup
                 streamSourceRef.current = source;
@@ -1200,7 +1233,6 @@ function App() {
                 console.error('STREAM DEBUG: Error creating EventSource:', err);
                 addStatusMessage('error', `Stream connection error: ${err.message}`);
                 setStreamStatus('error');
-
                 // Clear timeout
                 if (connectionTimeoutId) {
                     clearTimeout(connectionTimeoutId);
@@ -1225,6 +1257,7 @@ function App() {
             tryPollingFallback();
         }
     }, [sessionId, streaming, addStatusMessage, cleanupStream]);
+
 
     /**
      * Resume stream when user sends a new message
