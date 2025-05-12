@@ -21,6 +21,6 @@ export const ENDPOINTS = {
   GET_SESSION: (sessionId) => `${API_BASE_URL}/session/${sessionId}`,
   SEND_MESSAGE: (sessionId) => `${API_BASE_URL}/chat/${sessionId}`,
   VALIDATION_STATUS: (sessionId) => `${API_BASE_URL}/validation/status/${sessionId}`,
-  GET_VALIDATION_STATUS: (sessionId) => `${API_BASE_URL}/validation/report/${sessionId}/status`,
+  GET_VALIDATION_REPORT_STATUS: (sessionId) => `${API_BASE_URL}/validation/report/${sessionId}/status`,
   GENERATE_VALIDATION_REPORT: (sessionId) => `${API_BASE_URL}/validation/report/${sessionId}/generate`,
 };

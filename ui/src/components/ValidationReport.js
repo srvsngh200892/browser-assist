@@ -38,7 +38,7 @@ const ValidationReport = ({
 
         try {
             setLoading(true);
-            const response = await api.get(ENDPOINTS.GET_VALIDATION_STATUS(sessionId));
+            const response = await api.get(ENDPOINTS.GET_VALIDATION_REPORT_STATUS(sessionId));
 
             if (response.data.success) {
                 setStatus(response.data);
@@ -140,7 +140,7 @@ const ValidationReport = ({
 
             } else {
                 // Check status to get fresh download URL
-                const statusResponse = await api.get(ENDPOINTS.VALIDATION_STATUS);
+                const statusResponse = await api.get(ENDPOINTS.GET_VALIDATION_REPORT_STATUS(sessionId));
 
                 if (statusResponse.data.success && statusResponse.data.downloadUrl) {
                     setDownloadUrl(statusResponse.data.downloadUrl);
