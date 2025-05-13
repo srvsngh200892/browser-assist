@@ -1,10 +1,9 @@
 export const WELCOME_MESSAGE = [
     {
       role: 'assistant',
-      content: "Welcome! I'm here to help...",
+      content: 'Welcome! I\'m here to help you with your questions and tasks. How can I assist you today?',
       id: 'welcome-message',
       is_welcome: true,
       created_at: new Date().toISOString(),
     },
   ];
-  
