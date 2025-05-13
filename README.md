@@ -20,7 +20,7 @@ With natural language as the interface, this tool makes browser automation acces
 
 - Real-time browser streaming with screenshots
 - AI-powered assistance using OpenAI models
-- Generates PDF reports of the test results with conversation histoy
+- Generates PDF reports of the test results with conversation history
 - MCP (Model Context Protocol) Playwright by Microsoft for browser automation
 - Firebase integration for data persistence
 - User authentication and session management using JWT token and refresh token
@@ -86,7 +86,14 @@ mv localhost-key.pem nginx/localhost-key.pem
 
 3. Access the application:
    - https://localhost
-   - Firebase Emulator: http://localhost:8080
+   - Firebase Emulator: http://localhost:4000
+
+### Firebase
+
+```
+Only use firebase emulator for local development
+To deploy to the server, set USE_FIREBASE_EMULATOR=false in server/.env and provide your GCP Firebase credentials.
+```
 
 ## API Endpoints
 
