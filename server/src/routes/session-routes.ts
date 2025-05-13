@@ -93,7 +93,8 @@ router.get("/session/:sessionId", authMiddleware, async (req: any, res: Response
         return res.json({
             success: true,
             session: {
-                ...sessionData
+                ...sessionData,
+                user: user
             }
         });
     } catch (error) {

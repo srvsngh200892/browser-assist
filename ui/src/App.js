@@ -18,7 +18,6 @@ import { useStreamErrorHandling } from './hooks/useStreamErrorHandling'
 import { usePreviewPlaceholderReset } from './hooks/usePreviewPlaceholderReset'
 import { useSession } from './hooks/useSession'
 import { useStreamManagement } from './hooks/useStreamManagement'
-import { useMessageAction } from './hooks/useMessageAction'
 import { useHandleSendMessage } from './hooks/useHandleSendMessage'
 import { useToggleFunction } from './hooks/useToggleFunction'
 
@@ -54,7 +53,6 @@ function App() {
     const [messages, setMessages] = useState(WELCOME_MESSAGE);
     const [loading, setLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState(''); // For storing partial responses
-    const [typingMessageIds, setTypingMessageIds] = useState([]); // For tracking which messages are in typing state
 
 
     /**
@@ -86,8 +84,6 @@ function App() {
             resumeStream 
         } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
 
-    const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
-
         //Toggle Function
     const {showTechnicalMessages,
             previewVisible,
@@ -96,12 +92,11 @@ function App() {
         } = useToggleFunction()
 
     // Initial message loader
-    useInitialMessages(
+    const { typingMessageIds, setTypingMessageIds } = useInitialMessages(
         sessionId,
         loadingRef,
         messagesRef,
         setMessages,
-        setTypingMessageIds,
         setLoading,
         loading,
         messages
@@ -123,8 +118,6 @@ function App() {
         setTypingMessageIds,
         pollTimerRef,
         lastPollTimeRef,
-        handleNewAssistantMessages,
-        deduplicateMessages,
         setReusingSession,
         loadingRef,
         setError,
