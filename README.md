@@ -24,6 +24,7 @@ With natural language as the interface, this tool makes browser automation acces
 - MCP (Model Context Protocol) Playwright by Microsoft for browser automation
 - Firebase integration for data persistence
 - User authentication and session management using JWT token and refresh token
+- On logout your chat and session information will be deleted (You can customize based on your need).
 - Docker-based deployment for easy setup
 
 ## Architecture
@@ -54,16 +55,16 @@ git clone https://github.com/srvsngh200892/browser-assist.git
 cd browser-assist
 ```
 
-2. For Sever Create a `.env` file in the server directory with the following variables:
+2. For Sever Create a `.env` file in the ui and sever directory:
 
 ```bash
-Copy the server/.env.example file to server/.env and update the variables
+Copy the server/.env.example file to server/.env and update the variables that has "CHANGE_ME" unless you want to have different config
 ```
 
 2. For UI Create a `.env` file in the UI directory with the following variables:
 
 ```bash
-Copy the ui/.env.example file to ui/.env and update the variables
+Copy the ui/.env.example file to ui/.env and update the variables that has "CHANGE_ME" unless you want to have different config
 ```
 
 3. Setup https

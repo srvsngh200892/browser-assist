@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './SessionInfo.css';
-import api from './api'
+import api from '../api'
+import { ENDPOINTS } from '../constants';
 
 /**
  * Session Information Component
@@ -27,7 +28,7 @@ const SessionInfo = ({ sessionId, onError }) => {
             try {
                 setLoading(true);
 
-                const response = await api.get(`/api/session/${sessionId}`);
+                const response = await api.get(ENDPOINTS.GET_SESSION(sessionId));
 
                 if (response.data.success) {
                     setSessionData(response.data.session);
@@ -175,6 +176,11 @@ const SessionInfo = ({ sessionId, onError }) => {
 
             {expanded && (
                 <div className="session-info-content">
+                    <div className="session-info-item">
+                        <span className="session-info-label">User Email:</span>
+                    <span className="session-info-value">{sessionData?.user?.email}</span>
+                    </div>
+
                     <div className="session-info-item">
                         <span className="session-info-label">Session ID:</span>
                         <span className="session-info-value">{sessionData.sessionId.substring(0, 8)}...</span>
