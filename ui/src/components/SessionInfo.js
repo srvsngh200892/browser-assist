@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './SessionInfo.css';
 import api from '../api'
+import { ENDPOINTS } from '../constants';
 
 /**
  * Session Information Component
@@ -27,7 +28,7 @@ const SessionInfo = ({ sessionId, onError }) => {
             try {
                 setLoading(true);
 
-                const response = await api.get(`/api/session/${sessionId}`);
+                const response = await api.get(ENDPOINTS.GET_SESSION(sessionId));
 
                 if (response.data.success) {
                     setSessionData(response.data.session);

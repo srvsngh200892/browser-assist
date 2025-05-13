@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ENDPOINTS } from '../constants';
 
 const api = axios.create({
   baseURL:  process.env.REACT_APP_SERVER_URL, // adjust as needed
@@ -37,7 +38,7 @@ api.interceptors.response.use(
         originalRequest._retry = true;
 
         refreshPromise = api
-          .post('/api/refresh')
+          .post(ENDPOINTS.REFRESH)
           .then(() => {
             processQueue(null, true);
             return api(originalRequest); // retry original request
