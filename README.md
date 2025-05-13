@@ -55,7 +55,7 @@ git clone https://github.com/srvsngh200892/browser-assist.git
 cd browser-assist
 ```
 
-2. For Sever Create a `.env` file in the ui and sever directory:
+2. For Server Create a `.env` file in the ui and server directory:
 
 ```bash
 Copy the server/.env.example file to server/.env and update the variables that has "CHANGE_ME" unless you want to have different config
