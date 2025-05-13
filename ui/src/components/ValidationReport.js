@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api'
+import { ENDPOINTS } from '../constants';
 import './ValidationReport.css';
 
 /**
@@ -37,7 +38,7 @@ const ValidationReport = ({
 
         try {
             setLoading(true);
-            const response = await api.get(`/api/validation/report/${sessionId}/status`);
+            const response = await api.get(ENDPOINTS.GET_VALIDATION_REPORT_STATUS(sessionId));
 
             if (response.data.success) {
                 setStatus(response.data);
@@ -83,7 +84,7 @@ const ValidationReport = ({
             setReportModalOpen(true);
             setDownloadUrl(null); // Reset download URL
 
-            const response = await api.post(`/api/validation/report/${sessionId}/generate`);
+            const response = await api.post(ENDPOINTS.GENERATE_VALIDATION_REPORT(sessionId));
 
             if (response.data.success) {
                 // Start polling for status
@@ -119,7 +120,7 @@ const ValidationReport = ({
 
             // If we have a download URL, use it to download via the new API
             if (downloadUrl) {
-                const response = await api.post(`/api/validation/download-from-storage`, {
+                const response = await api.post(ENDPOINTS.DOWNLOAD_VALIDATION_REPORT, {
                     fileUrl: downloadUrl,
                     sessionId: sessionId
                 }, {
@@ -139,11 +140,11 @@ const ValidationReport = ({
 
             } else {
                 // Check status to get fresh download URL
-                const statusResponse = await api.get(`/api/validation/report/${sessionId}/status`);
+                const statusResponse = await api.get(ENDPOINTS.GET_VALIDATION_REPORT_STATUS(sessionId));
 
                 if (statusResponse.data.success && statusResponse.data.downloadUrl) {
                     setDownloadUrl(statusResponse.data.downloadUrl);
-                    const response = await api.post(`/api/validation/download-from-storage`, {
+                    const response = await api.post(ENDPOINTS.DOWNLOAD_VALIDATION_REPORT, {
                         fileUrl: statusResponse.data.downloadUrl,
                         sessionId: sessionId
                     }, {

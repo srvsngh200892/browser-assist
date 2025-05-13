@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import { ENDPOINTS } from '../constants';
 import api from '../api';
 import axios from 'axios';
 
@@ -20,7 +21,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
                 }
                 // Notify server about disconnection
                 if (sessionId) {
-                    api.post(`/api/stream-disconnect`, {
+                    api.post(ENDPOINTS.STREAM_DISCONNECT, {
                         sessionId: sessionId,
                         timestamp: Date.now()
                     }).catch(err => {
@@ -45,7 +46,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
         const takeScreenshot = async () => {
             if (!sessionId) return;
             try {
-                const response = await api.get(`/api/screenshot`, {
+                const response = await api.get(ENDPOINTS.GET_SCREENSHOTS, {
                     params: { sessionId: sessionId, _t: Date.now() }
                 });
                 if (response.data && response.data.image) {
@@ -111,7 +112,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
             addStatusMessage('info', 'Checking server connection...');
             const startTime = Date.now();
             console.log(`Starting ping #${requestId}`);
-            const response = await api.get(`/api/health?_t=${requestId}`,
+            const response = await api.get(`${ENDPOINTS.CHECK_HEALTH}?_t=${requestId}`,
                 {
                     timeout: 5000,
                     signal: controller.signal
@@ -170,7 +171,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
             // Close any existing stream
             cleanupStream();
             // Create EventSource directly without redundant health check
-            const streamUrl = `${SERVER_URL}/api/browser-stream/${sessionId}?_t=${Date.now()}`;
+            const streamUrl = `${ENDPOINTS.GET_STREAM(sessionId)}?_t=${Date.now()}`;
             console.log('STREAM DEBUG: EventSource URL:', streamUrl);
             try {
                 const source = new EventSource(streamUrl);
@@ -260,7 +261,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
                         refreshAttemptedRef.current = true;
                         let refreshed = false;
                         try {
-                            await api.post('/api/refresh');
+                            await api.post(ENDPOINTS.REFRESH);
                             refreshed = true;
                         } catch (err) {
                             console.log('error getting token from refresh token', err)
@@ -328,7 +329,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
             cleanupStream();
             // Notify server to resume sending data
             try {
-                api.post(`/api/stream-control`, {
+                api.post(ENDPOINTS.STREAM_CONTROL, {
                     sessionId: sessionId,
                     action: 'resume'
                 }).catch(err => console.log('Server may not support stream resuming yet'));
@@ -487,7 +488,7 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
             healthCheckControllerRef.current = new AbortController();
 
             try {
-                const response = await api.get(`/api/health?_t=${requestId}`,
+                const response = await api.get(`${ENDPOINTS.CHECK_HEALTH}?_t=${requestId}`,
                     {
                         timeout: 8000, // Increased timeout
                         signal: healthCheckControllerRef.current.signal,

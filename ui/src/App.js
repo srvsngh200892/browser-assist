@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { WELCOME_MESSAGE, PLACEHOLDER_IMAGE } from '../constants';
 import './App.css';
 import Header from './components/Header'; // Import the SessionInfo component
 import SessionInfo from './components/SessionInfo'; // Import the SessionInfo component
@@ -20,18 +21,6 @@ import { useStreamManagement } from './hooks/useStreamManagement'
 import { useMessageAction } from './hooks/useMessageAction'
 import { useHandleSendMessage } from './hooks/useHandleSendMessage'
 import { useToggleFunction } from './hooks/useToggleFunction'
-
-// Add session creation retry constants
-const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiAvPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCwzMDApIj4KICAgIDx0ZXh0IHg9IjAiIHk9Ii02MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmaWxsPSIjNmI0NmMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgQnJvd3NlciBQcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSItMTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzZjNzU3ZCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+CiAgICAgIE5vIGxpdmUgcHJldmlldyBhdmFpbGFibGUKICAgIDwvdGV4dD4KICAgIDx0ZXh0IHg9IjAiIHk9IjIwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICBDbGljayAiU3RhcnQgU3RyZWFtIiB0byBlbmFibGUgbGl2ZSBwcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgb3IgIlJlZnJlc2ggU2NyZWVuc2hvdCIgdG8gdGFrZSBhIHNpbmdsZSBzY3JlZW5zaG90CiAgICA8L3RleHQ+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCw1MDApIj4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmI0NmMxIiBzdHJva2Utd2lkdGg9IjIiIC8+CiAgICA8dGV4dCB4PSIwIiB5PSI2IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2YjQ2YzEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4=';
-const WELCOME_MESSAGE = [
-    {
-        role: 'assistant',
-        content: 'Welcome! I\'m here to help you with your questions and tasks. How can I assist you today?',
-        id: 'welcome-message',
-        is_welcome: true,  // Add a flag to clearly identify the welcome message
-        created_at: new Date().toISOString()
-    }
-]
 
 /**
  * OpenAI MCP Client
@@ -79,29 +68,98 @@ function App() {
         });
     }, []);
 
-    const { sessionIdRef, setError, setReusingSession } = useSession(sessionId)
-    const { streamSourceRef, streaming, streamStatus, setStreamStatus, cleanupStream, stopStream, pingServer, restartStream, startStream, reconnectToStream, resumeStream } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
-    const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
-        //Toggle Function
-    const {showTechnicalMessages, previewVisible, toggleTechnicalMessages, togglePreview} = useToggleFunction()
-    // Initial Messages
-    useInitialMessages(sessionId, loadingRef, messagesRef, setMessages, setTypingMessageIds, setLoading, loading, messages);
+    const { sessionIdRef,
+            setError,
+            setReusingSession 
+        } = useSession(sessionId)
 
+    const { streamSourceRef,
+            streaming,
+            streamStatus,
+            setStreamStatus,
+            cleanupStream,
+            stopStream,
+            pingServer,
+            restartStream,
+            startStream,
+            reconnectToStream, 
+            resumeStream 
+        } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
+
+    const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
+
+        //Toggle Function
+    const {showTechnicalMessages,
+            previewVisible,
+            toggleTechnicalMessages,
+            togglePreview
+        } = useToggleFunction()
+
+    // Initial message loader
+    useInitialMessages(
+        sessionId,
+        loadingRef,
+        messagesRef,
+        setMessages,
+        setTypingMessageIds,
+        setLoading,
+        loading,
+        messages
+    );
 
     const { hasScreenshots, screenshotCount } = useScreenshotAvailability(sessionId);
 
+    // Message sending logic
+    const { handleSendMessage, pollForMessages } = useHandleSendMessage(
+        sessionId,
+        setLoading,
+        setMessages,
+        setStreamingContent,
+        resumeStream,
+        streaming,
+        streamStatus,
+        messagesRef,
+        typingTimerRef,
+        setTypingMessageIds,
+        pollTimerRef,
+        lastPollTimeRef,
+        handleNewAssistantMessages,
+        deduplicateMessages,
+        setReusingSession,
+        loadingRef,
+        setError,
+        showTechnicalMessages,
+        typingMessageIds,
+        addStatusMessage,
+        setStreamStatus,
+        PLACEHOLDER_IMAGE,
+        setSessionId,
+        stopStream,
+        setBrowserImage
+    );
 
-    //Handle Send Message
-    const { handleSendMessage, pollForMessages } = useHandleSendMessage(sessionId, setLoading, setMessages, setStreamingContent, resumeStream, streaming, streamStatus, messagesRef, typingTimerRef, setTypingMessageIds, pollTimerRef, lastPollTimeRef, handleNewAssistantMessages, deduplicateMessages, setReusingSession, loadingRef, setError, showTechnicalMessages, typingMessageIds, addStatusMessage, setStreamStatus, PLACEHOLDER_IMAGE, setSessionId, stopStream, setBrowserImage)
-
-    // Session Initialization
-    const { takeScreenshot } = useSessionInitialization(isAuthenticated, setSessionId, setStreamStatus, addStatusMessage, sessionIdRef, setBrowserImage);
+    // Session init
+    const { takeScreenshot } = useSessionInitialization(
+        isAuthenticated,
+        setSessionId,
+        setStreamStatus,
+        addStatusMessage,
+        sessionIdRef,
+        setBrowserImage
+    );
 
     // Loading State Polling
     useLoadingStatePolling(loading, sessionId, pollForMessages, setLoading, messagesRef);
 
-    //Chat Scroll Handler
-    const {showScrollButton, setShowScrollButton, handleChatScroll, userScrolledAwayRef, scrollToBottom} = useChatScrollHandler(chatContainerRef);
+
+    // Chat scroll
+    const {
+        showScrollButton,
+        setShowScrollButton,
+        handleChatScroll,
+        userScrolledAwayRef,
+        scrollToBottom,
+    } = useChatScrollHandler(chatContainerRef);
 
     //Stream Pause on Inactivity
     useStreamPauseOnInactivity(loading, sessionId, streamStatus, setStreamStatus)

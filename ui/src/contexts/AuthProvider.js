@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
 import api from '../api'; // your axios instance
+import { ENDPOINTS } from '../constants';
 
 export const AuthContext = createContext();
 
@@ -19,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   const handleLogout = useCallback((deleteData = true) => {
     const currentSessionId = sessionId;
     if (currentSessionId) {
-      api.post('/api/logout', {
+      api.post(ENDPOINTS.LOGOUT, {
         sessionId: currentSessionId,
         deleteData: !!deleteData
       })
@@ -45,7 +46,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await api.get('/api/auth-check');
+        const res = await api.get(ENDPOINTS.AUTH_CHECK);
         if (res.data.isAuthenticated) {
           setIsAuthenticated(true);
           setUser(res.data.user);

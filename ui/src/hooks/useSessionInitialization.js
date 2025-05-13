@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { ENDPOINTS } from '../constants';
 import api from '../api';
 
 export const useSessionInitialization = (isAuthenticated, setSessionId, setStreamStatus, addStatusMessage, sessionIdRef, setBrowserImage) => {
@@ -10,7 +11,7 @@ export const useSessionInitialization = (isAuthenticated, setSessionId, setStrea
     if (!sessionIdRef.current) return;
 
     try {
-        const response = await api.get(`/api/screenshot`, {
+        const response = await api.get(ENDPOINTS.GET_SCREENSHOTS, {
             params: { sessionId: sessionIdRef.current, _t: Date.now() }
         });
 
