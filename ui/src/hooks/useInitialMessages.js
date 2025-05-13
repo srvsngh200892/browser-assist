@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import { ENDPOINTS } from '../constants';
 
-export const useInitialMessages = (sessionId, loadingRef, messagesRef, setMessages, setTypingMessageIds, setLoading, loading, messages) => {
+export const useInitialMessages = (sessionId, loadingRef, messagesRef, setMessages, setLoading, loading, messages) => {
+  const [typingMessageIds, setTypingMessageIds] = useState([]);
   useEffect(() => {
     const fetchInitialMessages = async () => {
       if (!sessionId) return;
@@ -66,4 +67,6 @@ export const useInitialMessages = (sessionId, loadingRef, messagesRef, setMessag
         }
     }
   }, [messages]);
+
+  return { typingMessageIds, setTypingMessageIds }
 }
