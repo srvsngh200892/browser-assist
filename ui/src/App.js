@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { WELCOME_MESSAGE, PLACEHOLDER_IMAGE } from '../constants';
+import { WELCOME_MESSAGE, PLACEHOLDER_IMAGE } from './constants';
 import './App.css';
 import Header from './components/Header'; // Import the SessionInfo component
 import SessionInfo from './components/SessionInfo'; // Import the SessionInfo component

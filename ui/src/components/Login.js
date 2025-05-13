@@ -52,29 +52,30 @@ function Login({ onLoginSuccess }) {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-
-        setFormData({
-            ...formData,
+    
+        setFormData(prev => ({
+            ...prev,
             [name]: value
-        });
-
-        // Validate field on change if it's been touched
-        if (touched[name]) {
-            validateField(name, value);
+        }));
+    
+        // Mark field as touched on first change
+        if (!touched[name]) {
+            setTouched(prev => ({
+                ...prev,
+                [name]: true
+            }));
         }
+    
+        // Re-validate as user types
+        validateField(name, value);
     };
 
     const handleBlur = (e) => {
         const { name, value } = e.target;
-
-        // Mark field as touched
-        setTouched({
-            ...touched,
-            [name]: true
-        });
-
-        // Validate field on blur
-        validateField(name, value);
+    
+        if (touched[name]) {
+            validateField(name, value);
+        }
     };
 
     const validateField = (name, value) => {
