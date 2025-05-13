@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import React, { useState, useRef, useCallback } from 'react';
+import { WELCOME_MESSAGE, PLACEHOLDER_IMAGE } from '../constants';
 import './App.css';
 import Header from './components/Header'; // Import the SessionInfo component
 import SessionInfo from './components/SessionInfo'; // Import the SessionInfo component
 import Login from './components/Login'; // Import the Login component
 import ChatSection from './components/ChatSection';
 import PreviewSection from './components/PreviewSection';
-import api from './api'
+import { useAuth } from './hooks/useAuth';
 import { useInitialMessages } from './hooks/useInitialMessages';
 import { useScreenshotAvailability } from './hooks/useScreenshotAvailability';
 import { useSessionInitialization } from './hooks/useSessionInitialization';
@@ -22,25 +22,18 @@ import { useMessageAction } from './hooks/useMessageAction'
 import { useHandleSendMessage } from './hooks/useHandleSendMessage'
 import { useToggleFunction } from './hooks/useToggleFunction'
 
-// Add session creation retry constants
-const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiAvPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCwzMDApIj4KICAgIDx0ZXh0IHg9IjAiIHk9Ii02MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmaWxsPSIjNmI0NmMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgQnJvd3NlciBQcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSItMTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzZjNzU3ZCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+CiAgICAgIE5vIGxpdmUgcHJldmlldyBhdmFpbGFibGUKICAgIDwvdGV4dD4KICAgIDx0ZXh0IHg9IjAiIHk9IjIwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICBDbGljayAiU3RhcnQgU3RyZWFtIiB0byBlbmFibGUgbGl2ZSBwcmV2aWV3CiAgICA8L3RleHQ+CiAgICA8dGV4dCB4PSIwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4KICAgICAgb3IgIlJlZnJlc2ggU2NyZWVuc2hvdCIgdG8gdGFrZSBhIHNpbmdsZSBzY3JlZW5zaG90CiAgICA8L3RleHQ+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwMCw1MDApIj4KICAgIDxjaXJjbGUgY3g9IjAiIGN5PSIwIiByPSIzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNmI0NmMxIiBzdHJva2Utd2lkdGg9IjIiIC8+CiAgICA8dGV4dCB4PSIwIiB5PSI2IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2YjQ2YzEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPgogICAgICA8L3RleHQ+CiAgPC9nPgo8L3N2Zz4=';
-const WELCOME_MESSAGE = [
-    {
-        role: 'assistant',
-        content: 'Welcome! I\'m here to help you with your questions and tasks. How can I assist you today?',
-        id: 'welcome-message',
-        is_welcome: true,  // Add a flag to clearly identify the welcome message
-        created_at: new Date().toISOString()
-    }
-]
-
 /**
  * OpenAI MCP Client
  */
 function App() {
-    // Refs for tracking state and timeouts
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [user, setUser] = useState(null);
+    const {
+        isAuthenticated,
+        user,
+        sessionId,
+        setSessionId,
+        handleLoginSuccess,
+        handleLogout,
+      } = useAuth();
         
 
     const [browserImage, setBrowserImage] = useState(PLACEHOLDER_IMAGE); // For storing the browser preview image
@@ -75,29 +68,98 @@ function App() {
         });
     }, []);
 
-    const { sessionId, setSessionId, sessionIdRef, setError, setReusingSession } = useSession(addStatusMessage)
-    const { streamSourceRef, streaming, streamStatus, setStreamStatus, cleanupStream, stopStream, pingServer, restartStream, startStream, reconnectToStream, resumeStream } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
-    const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
-        //Toggle Function
-    const {showTechnicalMessages, previewVisible, toggleTechnicalMessages, togglePreview} = useToggleFunction()
-    // Initial Messages
-    useInitialMessages(sessionId, loadingRef, messagesRef, setMessages, setTypingMessageIds, setLoading, loading, messages);
+    const { sessionIdRef,
+            setError,
+            setReusingSession 
+        } = useSession(sessionId)
 
+    const { streamSourceRef,
+            streaming,
+            streamStatus,
+            setStreamStatus,
+            cleanupStream,
+            stopStream,
+            pingServer,
+            restartStream,
+            startStream,
+            reconnectToStream, 
+            resumeStream 
+        } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
+
+    const { handleNewAssistantMessages, deduplicateMessages } = useMessageAction(setTypingMessageIds)
+
+        //Toggle Function
+    const {showTechnicalMessages,
+            previewVisible,
+            toggleTechnicalMessages,
+            togglePreview
+        } = useToggleFunction()
+
+    // Initial message loader
+    useInitialMessages(
+        sessionId,
+        loadingRef,
+        messagesRef,
+        setMessages,
+        setTypingMessageIds,
+        setLoading,
+        loading,
+        messages
+    );
 
     const { hasScreenshots, screenshotCount } = useScreenshotAvailability(sessionId);
 
+    // Message sending logic
+    const { handleSendMessage, pollForMessages } = useHandleSendMessage(
+        sessionId,
+        setLoading,
+        setMessages,
+        setStreamingContent,
+        resumeStream,
+        streaming,
+        streamStatus,
+        messagesRef,
+        typingTimerRef,
+        setTypingMessageIds,
+        pollTimerRef,
+        lastPollTimeRef,
+        handleNewAssistantMessages,
+        deduplicateMessages,
+        setReusingSession,
+        loadingRef,
+        setError,
+        showTechnicalMessages,
+        typingMessageIds,
+        addStatusMessage,
+        setStreamStatus,
+        PLACEHOLDER_IMAGE,
+        setSessionId,
+        stopStream,
+        setBrowserImage
+    );
 
-    //Handle Send Message
-    const { handleSendMessage, pollForMessages } = useHandleSendMessage(sessionId, setLoading, setMessages, setStreamingContent, resumeStream, streaming, streamStatus, messagesRef, typingTimerRef, setTypingMessageIds, pollTimerRef, lastPollTimeRef, handleNewAssistantMessages, deduplicateMessages, setReusingSession, loadingRef, setError, showTechnicalMessages, typingMessageIds, addStatusMessage, setStreamStatus, PLACEHOLDER_IMAGE, setSessionId, stopStream, setBrowserImage)
-
-    // Session Initialization
-    const { takeScreenshot } = useSessionInitialization(isAuthenticated, setSessionId, setStreamStatus, addStatusMessage, sessionIdRef, setBrowserImage);
+    // Session init
+    const { takeScreenshot } = useSessionInitialization(
+        isAuthenticated,
+        setSessionId,
+        setStreamStatus,
+        addStatusMessage,
+        sessionIdRef,
+        setBrowserImage
+    );
 
     // Loading State Polling
     useLoadingStatePolling(loading, sessionId, pollForMessages, setLoading, messagesRef);
 
-    //Chat Scroll Handler
-    const {showScrollButton, setShowScrollButton, handleChatScroll, userScrolledAwayRef, scrollToBottom} = useChatScrollHandler(chatContainerRef);
+
+    // Chat scroll
+    const {
+        showScrollButton,
+        setShowScrollButton,
+        handleChatScroll,
+        userScrolledAwayRef,
+        scrollToBottom,
+    } = useChatScrollHandler(chatContainerRef);
 
     //Stream Pause on Inactivity
     useStreamPauseOnInactivity(loading, sessionId, streamStatus, setStreamStatus)
@@ -111,80 +173,6 @@ function App() {
     //Scroll Button State
     useScrollButtonState(chatContainerRef, messages, messagesEndRef, userScrolledAwayRef, setShowScrollButton);
 
-    const handleLogout = useCallback((deleteData = true) => {
-        const currentSessionId = sessionIdRef.current;
-        if (currentSessionId) {
-            try {
-                cleanupStream();
-                api.post(`/api/logout`, {
-                    sessionId: currentSessionId,
-                    deleteData: !!deleteData
-                }, {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => {
-                    console.log(`Logout successful on server${deleteData ? ' (with data deletion)' : ''}`);
-                    cleanupStream();
-                    localStorage.clear();
-                    // Reset app state
-                    setUser(null);
-                    setMessages(WELCOME_MESSAGE);
-                    setBrowserImage(PLACEHOLDER_IMAGE);
-                    setLoading(false);
-                    setIsAuthenticated(false);
-                    setSessionId(null);
-    
-                    // ✅ Now reload after everything is cleaned up
-                    setTimeout(() => {
-                        window.location.href = window.location.origin; // more reliable than reload()
-                    }, 50);
-                }).catch(error => {
-                    console.error(`Logout error: ${error}`);
-                    throw error;
-                });
-            } catch (error) {
-                console.error('Error during logout process:', error.message || 'Unknown error');
-                throw error;
-            }
-        }
-    }, [cleanupStream]);
-
-
-    useEffect(() => {
-        const fetchAuthenticationStatus = async () => {
-            try {
-            const response = await api.get(`/api/auth-check`);
-            const { isAuthenticated, user } = response.data;
-            setIsAuthenticated(isAuthenticated);
-            if (isAuthenticated) {
-                setUser(user);
-            }
-            } catch (error) {
-            console.error('Error checking authentication:', error);
-            handleLogout();
-            }
-        };
-
-        fetchAuthenticationStatus();
-    }, [handleLogout]);
-
-    /**
-     * Authentication helper functions
-     */
-    const handleLoginSuccess = useCallback((userData) => {
-        setUser(userData);
-        setIsAuthenticated(true);
-
-        // Immediately set session ID from localStorage after login
-        const loginSessionId = localStorage.getItem('session_id');
-        if (loginSessionId) {
-            console.log('LOGIN DEBUG: Setting session ID immediately after login:', loginSessionId);
-            setSessionId(loginSessionId);
-        } else {
-            console.warn('LOGIN DEBUG: No session ID found in localStorage after login');
-        }
-    }, [setSessionId]);
  
     return (
         <div className="app-container">
@@ -197,7 +185,7 @@ function App() {
                         previewVisible={previewVisible}
                         pingServer={pingServer}
                         user={user} // Pass user as prop
-                        logout={handleLogout} // Pass logout as prop
+                        handleLogout={handleLogout} // Pass logout as prop
                     />
                     {sessionId && <SessionInfo sessionId={sessionId} />}
                     <main className="main-content">

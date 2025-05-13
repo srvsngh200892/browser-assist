@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import api from '../api';
+import { ENDPOINTS } from '../constants';
 
 export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStreamingContent, resumeStream, streaming, streamStatus, messagesRef, typingTimerRef, setTypingMessageIds, pollTimerRef, lastPollTimeRef, handleNewAssistantMessages, deduplicateMessages, setReusingSession, loadingRef, setError, showTechnicalMessages, typingMessageIds, addStatusMessage, setStreamStatus, PLACEHOLDER_IMAGE, setSessionId, stopStream, setBrowserImage) => {
 
@@ -51,7 +52,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
 
         // Get the last timestamp from localStorage if available
         const lastTimestamp = localStorage.getItem(`lastTimestamp-${sessionId}`);
-        let url = `/api/messages/${sessionId}`;
+        let url = ENDPOINTS.GET_MESSAGE(sessionId);
 
         // Add timestamp parameter if we have a previous timestamp
         if (lastTimestamp) {
@@ -267,7 +268,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
 
                 // Let server know to pause sending updates (with error handling)
                 try {
-                    api.post(`/api/stream-control`, {
+                    api.post(ENDPOINTS.STREAM_CONTROL, {
                         sessionId: sessionId,
                         action: 'pause',
                         reason: 'response_complete'
@@ -476,7 +477,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
             // Add a small delay to prevent rapid requests
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            const response = await api.post(`/api/session`, {}, {
+            const response = await api.post(ENDPOINTS.SESSION, {}, {
                 timeout: 10000,  // 10 second timeout
             });
 
@@ -583,7 +584,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
             }
             // Send message to server
             console.log('SEND: Sending message to server');
-            await api.post(`/api/chat/${sessionId}`, {
+            await api.post(ENDPOINTS.SEND_MESSAGE(sessionId), {
                 userMessage
             });
             console.log('SEND: Message sent successfully');

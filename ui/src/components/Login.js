@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Login.css';
 import api from '../api'
+import { ENDPOINTS } from '../constants';
 
 function Login({ onLoginSuccess }) {
     const [isLogin, setIsLogin] = useState(true);
@@ -163,7 +164,7 @@ function Login({ onLoginSuccess }) {
         localStorage.clear();
 
         try {
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+            const endpoint = isLogin ? ENDPOINTS.LOGIN : ENDPOINTS.REGISTER;
             const payload = isLogin
                 ? { email: formData.email, password: formData.password }
                 : { username: formData.username, email: formData.email, password: formData.password };
@@ -186,7 +187,7 @@ function Login({ onLoginSuccess }) {
                 // Slight delay before redirecting for better UX
                 setTimeout(() => {
                     // Notify parent component
-                    onLoginSuccess(response.data.user);
+                    onLoginSuccess(response.data.user, response.data.sessionId);
                 }, 1000);
             } else {
                 setError(response.data.error || 'Authentication failed');
@@ -287,11 +288,11 @@ function Login({ onLoginSuccess }) {
                         {validationErrors.password && touched.password && (
                             <div className="field-error">{validationErrors.password}</div>
                         )}
-                        {isLogin && (
+                        {/* {isLogin && (
                             <div className="forgot-password">
                                 <a href="#reset-password">Forgot password?</a>
                             </div>
-                        )}
+                        )} */}
                     </div>
 
                     {!isLogin && (

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { ENDPOINTS } from '../constants';
 
 export const useInitialMessages = (sessionId, loadingRef, messagesRef, setMessages, setTypingMessageIds, setLoading, loading, messages) => {
   useEffect(() => {
     const fetchInitialMessages = async () => {
       if (!sessionId) return;
       try {
-        const response = await api.get(`/api/messages/${sessionId}`);
+        const response = await api.get(ENDPOINTS.GET_MESSAGE(sessionId));
         if (response.data.success && response.data.messages.length > 1) {
           setMessages(response.data.messages);
           localStorage.setItem(`lastTimestamp-${sessionId}`, response.data.messages[response.data.messages.length - 1].timestamp);
