@@ -88,6 +88,13 @@ mv localhost-key.pem nginx/localhost-key.pem
    - https://localhost
    - Firebase Emulator: http://localhost:4000
 
+### Firebase
+
+```
+Only use firebase emulator for local development
+To deploy to the server, set USE_FIREBASE_EMULATOR=false in server/.env and provide your GCP Firebase credentials.
+```
+
 ## API Endpoints
 
 ### Session Management
