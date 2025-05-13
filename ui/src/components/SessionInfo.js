@@ -177,6 +177,11 @@ const SessionInfo = ({ sessionId, onError }) => {
             {expanded && (
                 <div className="session-info-content">
                     <div className="session-info-item">
+                        <span className="session-info-label">User Email:</span>
+                    <span className="session-info-value">{sessionData?.user?.email}</span>
+                    </div>
+
+                    <div className="session-info-item">
                         <span className="session-info-label">Session ID:</span>
                         <span className="session-info-value">{sessionData.sessionId.substring(0, 8)}...</span>
                     </div>

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import api from '../api';
 import { ENDPOINTS } from '../constants';
 
-export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStreamingContent, resumeStream, streaming, streamStatus, messagesRef, typingTimerRef, setTypingMessageIds, pollTimerRef, lastPollTimeRef, handleNewAssistantMessages, deduplicateMessages, setReusingSession, loadingRef, setError, showTechnicalMessages, typingMessageIds, addStatusMessage, setStreamStatus, PLACEHOLDER_IMAGE, setSessionId, stopStream, setBrowserImage) => {
+export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStreamingContent, resumeStream, streaming, streamStatus, messagesRef, typingTimerRef,  setTypingMessageIds, pollTimerRef, lastPollTimeRef, setReusingSession, loadingRef, setError, showTechnicalMessages, typingMessageIds, addStatusMessage, setStreamStatus, PLACEHOLDER_IMAGE, setSessionId, stopStream, setBrowserImage) => {
 
 // Session Initialization => {
         /**
@@ -28,6 +28,70 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
     const SESSION_REQUEST_DEBOUNCE_KEY = 'session-request-debounce'; // Key for tracking recent requests
     const SESSION_REQUEST_DEBOUNCE_TIME = 3000; // 3 seconds debounce time
     const LOCAL_POLL_INTERVAL = 10000; // Using a local variable to avoid naming conflict
+
+    const handleNewAssistantMessages = useCallback((newMessages) => {
+        console.log('TYPING: Found new assistant messages for typing animation:', newMessages.length);
+
+        // For each new assistant message, add it to typingMessageIds
+        const newTypingIds = newMessages
+            .filter(msg =>
+                !msg.is_welcome &&
+                msg.id !== 'welcome-message' &&
+                !msg.content?.includes('Welcome! I\'m here to help you with your questions')
+            )
+            .map(msg => msg.id || `assistant-${Date.now()}`);
+
+        // Set the typing message IDs
+        setTypingMessageIds(prev => {
+            // Filter out any existing typing IDs to avoid duplicates
+            const existingIds = prev.filter(id => !newTypingIds.includes(id));
+            return [...existingIds, ...newTypingIds];
+        });
+
+        // Clear any existing typing timer first to prevent rapid flickering
+        if (typingTimerRef.current) {
+            clearTimeout(typingTimerRef.current);
+            typingTimerRef.current = null;
+        }
+
+        // After a delay, remove the typing animation from new messages
+        typingTimerRef.current = setTimeout(() => {
+            console.log('TYPING: Removing typing animation for new messages');
+            setTypingMessageIds(prev =>
+                prev.filter(id => !newTypingIds.includes(id))
+            );
+            typingTimerRef.current = null;
+        }, 1500);
+    }, [setTypingMessageIds]);
+
+
+    const deduplicateMessages = useCallback((messages) => {
+        // Create a simple map to track seen messages
+        const seen = new Map();
+        const result = [];
+        // Process messages in order
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            // For other messages, prefer ID if available
+            const key = msg.tool_call_id ?
+                `${msg.role}:${msg.tool_call_id}` :
+                msg.id ?
+                    `${msg.role}:${msg.id}` :
+                    `${msg.role}:${msg.created_at || Date.now()}`;
+            // If we haven't seen this message yet, add it to the result
+            if (!seen.has(key)) {
+                seen.set(key, true);
+                result.push(msg);
+            } else {
+                console.log(`DEDUP: Removed duplicate message with role ${msg.role}`);
+            }
+        }
+        // Log deduplication results
+        if (messages.length !== result.length) {
+            console.log(`DEDUP: Removed ${messages.length - result.length} duplicate messages`);
+        }
+        return result;
+    }, []);
 
     const pollForMessages = useCallback(async () => {
 
@@ -629,7 +693,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
             }
         }
         return
-    }, [sessionId, setLoading, setMessages, setStreamingContent, pollForMessages, handleSessionExpired, clearMessageHistory, resumeStream, streaming, streamStatus]);
+    }, [sessionId, setLoading, setMessages, setStreamingContent, pollForMessages, handleSessionExpired, addStatusMessage, clearMessageHistory, resumeStream, streaming, streamStatus]);
 
     return { handleSendMessage, pollForMessages }
 }

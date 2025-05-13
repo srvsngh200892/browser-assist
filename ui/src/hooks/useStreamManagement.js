@@ -9,7 +9,6 @@ export const useStreamManagement = (sessionId, setBrowserImage, addStatusMessage
     const refreshAttemptedRef = useRef(false);
     const [streaming, setStreaming] = useState(false);
     const [streamStatus, setStreamStatus] = useState('waiting');
-    const SERVER_URL = process.env.REACT_APP_SERVER_URL
 
     const cleanupStream = useCallback(() => {
         if (streamSourceRef.current) {
