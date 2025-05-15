@@ -197,3 +197,24 @@ async function updateScreenshotCount(sessionId: string): Promise<void> {
         console.error(`Error updating screenshot count for session ${sessionId}:`, error);
     }
 }
+
+
+
+/**
+ * Fetches all image buffers from a specific folder path in Firebase Storage.
+ * @param sessionId session id
+ * @returns Array of Buffers
+ */
+ export async function fetchImagesForSession(sessionId: string): Promise<Buffer[]> {
+    const prefix =`validations/${sessionId}/screenshots`
+    const [files] = await bucket.getFiles({ prefix });
+    const imageFiles = files.filter(file => file.name !== prefix); // Skip folder marker
+    const imageBuffers = await Promise.all(
+      imageFiles.map(async file => {
+        const [buffer] = await file.download();
+        return buffer;
+      })
+    );
+
+    return imageBuffers;
+  }

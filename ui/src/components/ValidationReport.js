@@ -23,14 +23,25 @@ const ValidationReport = ({
     const [reportModalOpen, setReportModalOpen] = useState(false);
     const [downloadUrl, setDownloadUrl] = useState(null);
 
+    // New state variables for AI validation
+    const [aiValidating, setAiValidating] = useState(false);
+    const [aiValidationStatus, setAiValidationStatus] = useState(null);
+    const [aiValidationResult, setAiValidationResult] = useState(null);
+    const [aiValidationError, setAiValidationError] = useState(null);
+    const [aiPollInterval, setAiPollInterval] = useState(null);
+    const [currentAgent, setCurrentAgent] = useState(null);
+
     // Clean up polling on unmount
     useEffect(() => {
         return () => {
             if (pollInterval) {
                 clearInterval(pollInterval);
             }
+            if (aiPollInterval) {
+                clearInterval(aiPollInterval);
+            }
         };
-    }, [pollInterval]);
+    }, [pollInterval, aiPollInterval]);
 
     // Check validation report status
     const checkStatus = async () => {
@@ -81,7 +92,6 @@ const ValidationReport = ({
         try {
             setGenerating(true);
             setError(null);
-            setReportModalOpen(true);
             setDownloadUrl(null); // Reset download URL
 
             const response = await api.post(ENDPOINTS.GENERATE_VALIDATION_REPORT(sessionId));
@@ -174,13 +184,100 @@ const ValidationReport = ({
         }
     };
 
+    // Start AI validation process
+    const startAiValidation = async () => {
+        if (!sessionId || aiValidating) return;
+
+        try {
+            setAiValidating(true);
+            setAiValidationError(null);
+            setAiValidationResult(null);
+            setDownloadUrl(null); // Reset any existing download URL
+
+            const response = await api.post(ENDPOINTS.VALIDATE_VIA_AI, {
+                sessionId: sessionId
+            });
+
+            if (response.data.success) {
+                // Start polling for AI validation status
+                if (aiPollInterval) {
+                    clearInterval(aiPollInterval);
+                }
+
+                const interval = setInterval(checkAiValidationStatus, 1500); //poll every 1.5 seconds
+                setAiPollInterval(interval);
+
+                // Initial status update
+                setAiValidationStatus('processing');
+                setCurrentAgent(response.data.agent);
+            } else {
+                setAiValidationError('Failed to start AI validation');
+                setAiValidating(false);
+            }
+        } catch (err) {
+            console.error('Error starting AI validation:', err);
+            setAiValidationError(`Error: ${err.message}`);
+            setAiValidating(false);
+            if (onError) onError(err.message);
+        }
+    };
+
+    // Check AI validation status and trigger report generation when complete
+    const checkAiValidationStatus = async () => {
+        if (!sessionId) return;
+
+        try {
+            const response = await api.get(ENDPOINTS.GET_VALIDATE_VIA_AI_STATUS(sessionId));
+            const { status, result, error, agent } = response.data;
+
+            setAiValidationStatus(status);
+            setCurrentAgent(agent);
+
+            if (error) {
+                setAiValidationError(error);
+                clearInterval(aiPollInterval);
+                setAiPollInterval(null);
+                setAiValidating(false);
+                return;
+            }
+
+            if (status === 'completed') {
+                setAiValidationResult(result);
+                clearInterval(aiPollInterval);
+                setAiPollInterval(null);
+                setAiValidating(false);
+                setCurrentAgent(null);
+
+                // Automatically start report generation after AI validation completes
+                if (result.finalResult === 'Pass') {
+                    await startGeneration();
+                }
+            }
+        } catch (err) {
+            console.error('Error checking AI validation status:', err);
+            setAiValidationError(`Error: ${err.message}`);
+            clearInterval(aiPollInterval);
+            setAiPollInterval(null);
+            setAiValidating(false);
+            setCurrentAgent(null);
+            if (onError) onError(err.message);
+        }
+    };
+
     // Toggle the report modal
     const toggleReportModal = () => {
-        // Check status when opening the modal
-        if (!reportModalOpen) {
-            setDownloadUrl(null);
-            checkStatus();
-        }
+        // Reset all states when opening or closing the modal
+        setDownloadUrl(null);
+        setStatus(null);
+        setError(null);
+        setProgress(0);
+        setGenerating(false);
+        setAiValidationResult(null);
+        setAiValidationError(null);
+        setAiValidating(false);
+        setCurrentAgent(null);
+
+        // Toggle modal state
         setReportModalOpen(!reportModalOpen);
     };
 
@@ -195,10 +292,10 @@ const ValidationReport = ({
             <button
                 className="report-button"
                 onClick={toggleReportModal}
-                title="Generate Validation Report"
+                title="Validate with Agent"
             >
-                <span className="report-button-icon">📊</span>
-                <span className="report-button-text">Validation Report</span>
+                <span className="report-button-icon">🤖</span>
+                <span className="report-button-text">Validate with Agent</span>
             </button>
         );
     }
@@ -207,19 +304,20 @@ const ValidationReport = ({
     return (
         <div className={`validation-report ${reportModalOpen ? 'modal' : ''}`}>
             {reportModalOpen && (
-                <div className="modal-overlay" onClick={() => !generating && setReportModalOpen(false)}>
+                <div className="modal-overlay" onClick={() => !generating && !aiValidating && setReportModalOpen(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <button
                             className="close-modal-button"
-                            onClick={() => !generating && setReportModalOpen(false)}
+                            onClick={() => !generating && !aiValidating && setReportModalOpen(false)}
                             title="Close"
+                            disabled={generating || aiValidating}
                         >
                             ✕
                         </button>
 
                         <div className="validation-report-header">
                             <h3>Validation Report</h3>
-                            <p>Generate and download a PDF report with screenshots and chat history</p>
+                            <p>First validate with AI, then generate and download the PDF report</p>
                         </div>
 
                         {error && (
@@ -247,7 +345,7 @@ const ValidationReport = ({
 
                         {downloadUrl && !generating && !error && (
                             <div className="download-ready-message">
-                                Your report is ready to download!
+                                <span className="success-icon">✓</span> Your report is ready to download!
                             </div>
                         )}
 
@@ -258,19 +356,27 @@ const ValidationReport = ({
                         )}
 
                         <div className="validation-report-buttons">
-                            {!generating && (
-                                <button
-                                    className={`action-icon-button generate ${screenshotCount === 0 ? 'disabled' : ''}`}
-                                    onClick={startGeneration}
-                                    disabled={loading || generating || screenshotCount === 0}
-                                    title={screenshotCount === 0 ? "No screenshots available" : "Generate Report"}
-                                >
-                                    <span className="icon">📊</span>
-                                    <span className="label">Generate</span>
-                                </button>
-                            )}
+                            <button
+                                className={`action-icon-button validate-ai ${screenshotCount === 0 ? 'disabled' : ''}`}
+                                onClick={startAiValidation}
+                                disabled={loading || aiValidating || screenshotCount === 0}
+                                title={screenshotCount === 0 ? "No screenshots available" : "Start AI Validation"}
+                            >
+                                <span className="icon">🤖</span>
+                                <span className="label">Validate with AI</span>
+                            </button>
 
-                            {(status?.status === 'completed' || downloadUrl) && (
+                            <button
+                                className={`action-icon-button generate ${screenshotCount === 0 ? 'disabled' : ''}`}
+                                onClick={startGeneration}
+                                disabled={loading || generating || screenshotCount === 0 || aiValidating}
+                                title={screenshotCount === 0 ? "No screenshots available" : downloadUrl ? "Regenerate Report" : "Generate Report"}
+                            >
+                                <span className="icon">📊</span>
+                                <span className="label">{downloadUrl ? "Regenerate Report" : "Generate Report"}</span>
+                            </button>
+
+                            {downloadUrl && !generating && !aiValidating && (
                                 <button
                                     className="action-icon-button download"
                                     onClick={downloadReport}
@@ -278,10 +384,72 @@ const ValidationReport = ({
                                     title="Download Report"
                                 >
                                     <span className="icon">📥</span>
-                                    <span className="label">Download</span>
+                                    <span className="label">Download Report</span>
                                 </button>
                             )}
                         </div>
+
+                        {/* AI Validation Results Section */}
+                        {(aiValidating || aiValidationResult || aiValidationError) && (
+                            <div className="validation-ai-section">
+                                {aiValidationResult && (
+                                    <div className={`validation-ai-header ${aiValidationResult.finalResult.toLowerCase()}`}>
+                                        <span className="validation-ai-icon">
+                                            {aiValidationResult.finalResult === 'Pass' ? '✓' :
+                                                aiValidationResult.finalResult === 'Fail' ? '✕' : '?'}
+                                        </span>
+                                        <h4>AI Validation Results</h4>
+                                    </div>
+                                )}
+
+                                {aiValidating && (
+                                    <div className="ai-validation-progress">
+                                        <div className="validation-progress-steps">
+                                            <div className={`validation-progress-step ${currentAgent === 'test-planner' || currentAgent === null ? 'active' : currentAgent === 'qa-validator' || currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
+                                                <div className="progress-step-icon">🧠</div>
+                                                <p>Planner</p>
+                                            </div>
+                                            <div className={`validation-progress-step ${currentAgent === 'qa-validator' ? 'active' : currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
+                                                <div className="progress-step-icon">🔍</div>
+                                                <p>Validator</p>
+                                            </div>
+                                            <div className={`validation-progress-step ${currentAgent === 'qa-reviewer' ? 'active' : ''}`}>
+                                                <div className="progress-step-icon">🧐</div>
+                                                <p>Reviewer</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {aiValidationError && (
+                                    <div className="ai-validation-error">
+                                        {aiValidationError}
+                                    </div>
+                                )}
+
+                                {aiValidationResult && (
+                                    <div className="ai-validation-result">
+                                        <div className="validation-steps">
+                                            {aiValidationResult.steps.map((step, index) => (
+                                                <div key={index} className={`validation-step ${step.status}`}>
+                                                    <div className="step-header">
+                                                        <span className="step-number">{index + 1}</span>
+                                                        <span className="step-title">{step.step}</span>
+                                                        <span className="step-status">
+                                                            {step.status === 'passed' ? '✓' :
+                                                                step.status === 'failed' ? '✕' : '?'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="step-explanation">
+                                                        {step.explanation}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -61,13 +61,13 @@ cd browser-assist
 Copy the server/.env.example file to server/.env and update the variables that has "CHANGE_ME" unless you want to have different config
 ```
 
-2. For UI Create a `.env` file in the UI directory with the following variables:
+3. For UI Create a `.env` file in the UI directory with the following variables:
 
 ```bash
 Copy the ui/.env.example file to ui/.env and update the variables that has "CHANGE_ME" unless you want to have different config
 ```
 
-3. Setup https
+4. Setup https
 
 ```bash
 brew install mkcert

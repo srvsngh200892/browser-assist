@@ -85,7 +85,7 @@ function App() {
         } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
 
         //Toggle Function
-    const {showTechnicalMessages,
+    const { showTechnicalMessages,
             previewVisible,
             toggleTechnicalMessages,
             togglePreview

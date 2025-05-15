@@ -95,11 +95,14 @@
     border-radius: 12px;
     padding: 24px;
     width: 90%;
-    max-width: 450px;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     z-index: 1001;
     animation: slideUp 0.4s ease;
     border: 1px solid rgba(107, 70, 193, 0.1);
+    position: relative;
 }
 
 @keyframes slideUp {
@@ -208,6 +211,19 @@
 
 .action-icon-button.download .icon {
     color: #38a169;
+}
+
+.action-icon-button.validate-ai {
+    background-color: transparent;
+    color: #4a5568;
+}
+
+.action-icon-button.validate-ai .icon {
+    color: #6b46c1;
+}
+
+.action-icon-button.validate-ai:hover:not(:disabled) {
+    background-color: rgba(226, 232, 240, 0.5);
 }
 
 .action-icon-button.disabled {
@@ -348,10 +364,396 @@
 @media (max-width: 768px) {
     .modal-content {
         width: 95%;
-        padding: 20px 16px;
+        max-width: none;
+        margin: 20px;
+        padding: 20px;
     }
 
     .validation-report-buttons {
         width: 100%;
+    }
+
+    .step-header {
+        flex-wrap: wrap;
+    }
+
+    .step-explanation {
+        margin-left: 0;
+        margin-top: 8px;
+    }
+}
+
+.validation-ai-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.validation-ai-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.validation-ai-header.pass {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+}
+
+.validation-ai-header.fail {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+}
+
+.validation-ai-header.incomplete {
+    background: linear-gradient(135deg, #718096 0%, #4A5568 100%);
+}
+
+.validation-ai-icon {
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    color: white;
+}
+
+.validation-ai-header h4 {
+    color: white;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.ai-validation-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+}
+
+.analyzing-logo {
+    font-size: 48px;
+    margin-bottom: 15px;
+    animation: pulseBrain 2s infinite;
+}
+
+@keyframes pulseBrain {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.ai-validation-progress p {
+    color: #6b46c1;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Remove the old loading spinner styles */
+.loading-spinner {
+    display: none;
+}
+
+.ai-validation-error {
+    padding: 12px;
+    background-color: #fff5f5;
+    border: 1px solid #feb2b2;
+    border-radius: 6px;
+    color: #c53030;
+    margin: 10px 0;
+}
+
+.ai-validation-result {
+    padding: 15px;
+    background-color: #f7fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+/* Style markdown content within the result */
+.ai-validation-result h1,
+.ai-validation-result h2,
+.ai-validation-result h3 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    color: #2d3748;
+}
+
+.ai-validation-result p {
+    margin-bottom: 1em;
+}
+
+.ai-validation-result ul,
+.ai-validation-result ol {
+    margin-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.ai-validation-result code {
+    background-color: #edf2f7;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+/* Style the validation steps */
+.validation-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.validation-step {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.validation-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.validation-step.passed {
+    border-left: 4px solid #48bb78;
+}
+
+.validation-step.failed {
+    border-left: 4px solid #f56565;
+}
+
+.validation-step.incomplete {
+    border-left: 4px solid #718096;
+}
+
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.step-number {
+    background-color: #6b46c1;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.step-title {
+    flex: 1;
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 16px;
+}
+
+.step-status {
+    font-size: 20px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.validation-step.passed .step-status {
+    color: #48bb78;
+    background: rgba(72, 187, 120, 0.1);
+}
+
+.validation-step.failed .step-status {
+    color: #e53e3e;
+    background: rgba(229, 62, 62, 0.1);
+}
+
+.validation-step.incomplete .step-status {
+    color: #718096;
+    background: rgba(113, 128, 150, 0.1);
+}
+
+.step-explanation {
+    color: #4a5568;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-left: 36px;
+}
+
+/* New CSS for validation progress indicators */
+.validation-progress-steps {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px 10px;
+    gap: 30px;
+    position: relative;
+}
+
+.validation-progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    opacity: 0.6;
+    width: 100px;
+}
+
+.validation-progress-step::after {
+    content: '';
+    position: absolute;
+    right: -30px;
+    top: 50%;
+    width: 30px;
+    height: 2px;
+    background: #e2e8f0;
+    transform: translateY(-50%);
+    z-index: 0;
+}
+
+.validation-progress-step:last-child::after {
+    display: none;
+}
+
+.progress-step-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.validation-progress-step p {
+    margin: 0;
+    color: #6b46c1;
+    font-weight: 500;
+    font-size: 12px;
+    text-align: center;
+}
+
+.validation-progress-step.active {
+    opacity: 1;
+    box-shadow: 0 4px 12px rgba(107, 70, 193, 0.2);
+    border: 2px solid #6b46c1;
+    transform: translateY(-4px);
+    animation: borderPulse 2s infinite;
+}
+
+.validation-progress-step.active .progress-step-icon {
+    animation: progressIconPulse 2s infinite;
+}
+
+.validation-progress-step.completed {
+    opacity: 1;
+    background: #f8f7ff;
+    border: 2px solid #9f7aea;
+}
+
+.validation-progress-step.completed::after {
+    background: #9f7aea;
+}
+
+@keyframes progressIconPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes borderPulse {
+    0% {
+        border-color: rgba(107, 70, 193, 0.6);
+        box-shadow: 0 0 5px rgba(107, 70, 193, 0.2);
+    }
+
+    50% {
+        border-color: rgba(107, 70, 193, 1);
+        box-shadow: 0 0 15px rgba(107, 70, 193, 0.4);
+    }
+
+    100% {
+        border-color: rgba(107, 70, 193, 0.6);
+        box-shadow: 0 0 5px rgba(107, 70, 193, 0.2);
+    }
+}
+
+/* Custom scrollbar for the modal */
+.modal-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+.validation-step.active .step-icon {
+    animation: activeStepPulse 2s infinite;
+}
+
+@keyframes activeStepPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
     }
 }
