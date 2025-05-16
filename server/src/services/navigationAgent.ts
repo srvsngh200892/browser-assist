@@ -31,7 +31,7 @@ import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 
 
 export // Function to process responses asynchronously
-    async function processResponse(sessionId: string, messageHandler: MessageHandler) {
+    async function runNavigationAgent(sessionId: string, messageHandler: MessageHandler) {
     try {
         await updateSessionMetadata(sessionId, {
             messageProcessing: true

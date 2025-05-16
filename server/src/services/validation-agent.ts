@@ -4,7 +4,7 @@ import { getAllUserMessage } from './firebase-messages';
 import { fetchImagesForSession } from './firebase-storage';
 import { updateValidation } from './firebase-validation';
 
-async function reviewUserIntent(sessionId: string) {
+async function reviewUserIntentAgent(sessionId: string) {
   const allUserMessages = await getAllUserMessage(sessionId) || [];
   console.log("allUserMessages", allUserMessages)
   if (allUserMessages.length === 0) {
@@ -20,19 +20,19 @@ async function reviewUserIntent(sessionId: string) {
     .map((msg: string, index: number) => `${index + 1}. ${msg.trim()}`)
     .join('\n');
 
-    const inputPrompt = `
+  const inputPrompt = `
     You are an assistant reviewing a sequence of user interactions or instructions.
   
     Your task is to extract a **step-by-step list of meaningful platform actions** the user performed or is instructed to perform, in order.
   
     Instructions:
     1. Write each step as a short, specific sentence, starting with a verb.
-    2. Include only **explicit UI actions** (e.g. "clicked a button") and **critical resulting states** (e.g. "language changed", "study created").
-    3. Do **not add inferred or assumed steps** — extract only what is clearly written.
+    2. Include only **explicit UI actions** (e.g. "clicked a button") and **critical resulting states** (e.g. "language changed", "something created/updated/deleted").
+    3. Do not add steps unless they are explicitly and literally stated in the input. Do not infer, expand, or assume any context.
     4. Ignore casual messages, greetings, or repeated confirmations.
-    5. Break down compound instructions into **individual steps**, and **preserve the order**.
-    6. Do **not summarize** — extract one step per line, and **preserve order**.
-    7. Number each step clearly. Your output will be used to validate against screenshots.
+    5. Break down compound instructions into **individual steps**, and **preserve the order**. Do not fill in missing context or add intermediate steps.
+    7. Do **not summarize** — extract one step per line, and **preserve order**.
+    8. Number each step clearly. Your output will be used to validate against screenshots.
   
     ⚠️ Example (what NOT to do):
     Input: "1. go to https://youtube.com"
@@ -74,14 +74,14 @@ function chunk<T>(arr: T[], size: number): T[][] {
   );
 }
 
-export async function validateScreenshots(sessionId: string): Promise<any> {
+export async function runValidationAgent(sessionId: string): Promise<any> {
   try {
     await updateValidation(sessionId, { agent: 'qa-validator' });
     const screenshotsBuffers = await fetchImagesForSession(sessionId);
     console.log("screenshotsBuffers", screenshotsBuffers);
     const batches = chunk(screenshotsBuffers, 3);
     const results: string[] = [];
-    const userSummary = await reviewUserIntent(sessionId);
+    const userSummary = await reviewUserIntentAgent(sessionId);
     if (!userSummary) {
       return {
         "steps": [
@@ -93,37 +93,34 @@ export async function validateScreenshots(sessionId: string): Promise<any> {
 
     const systemPrompt = `
 
-You are a QA validator. The user claims to have completed a multi-step task. You are provided with partial screenshots as evidence. Just focus on the step provided by user dont hallucinate or create your own steps, just stick to steps provided by user.
+You are a QA validator responsible for evaluating a user's claim of completing a multi-step task using partial screenshots as evidence. Your task is to assess only the steps provided by the user without adding, inventing, or assuming any additional steps.
 
-For each step in the task, assign one of the following statuses based strictly on what is visible in the screenshots:
+✅ Evaluation Rules:
+- For each task step, assign one of the following statuses based solely on the visual evidence in the screenshots:
+  - **passed**: The screenshot clearly shows the step's result, or the result could not have occurred without completing that step.
+  - **failed**: The step was clearly attempted, but the result is incorrect, broken, or visibly incomplete.
+  - **invisible**: The step is not shown, and there is no visible result to confirm it occurred.
 
-- **passed**: There is clear evidence that the step was performed successfully, or the expected result of the step is shown and could not have occurred without completing that step.
+📌 Strict Rules and Clarifications:
+- **Running Context (Earlier screenshots showed)**: 
+  - When evaluating steps in the current batch, always refer to the previous running context(Earlier screenshots showed) if context passed. Any steps that were not marked as passed in the previous context must be explicitly checked again in the current batch. Do not assume they failed or were skipped — treat them as pending and verify their status during the current evaluation.
+- **Visible results count**: 
+  - You do not need to see the user typing, clicking, or navigating. If the result (e.g., a specific page, interface, modal, or a login screen) clearly implies that action occurred, that is enough to mark it as passed.
+  - If a subsequent step is shown in provided screenshots, it indicates the previous step was completed successfully, and you can mark it as passed.
+- **Do not require the address bar**: 
+  - If a known page, app, or interface is clearly shown, assume the navigation occurred correctly. You do not need to see the browser’s address bar.
+  - ✅ If a known, specific webpage or interface is visible (e.g., sign-in page, landing page, login page, or logo is visible, etc.), you may assume the navigation to the correct URL occurred.
+  - 🔴 Do NOT penalize steps for lack of address bar or explicit URL visibility.
+  - 🔒 If a screen is unique to a domain, it is sufficient proof that the correct URL was visited.
+- **Do not require visible user actions**: If a result appears that could only come from a specific user action (e.g., clicking a button, submitting a form, typing a URL), that is sufficient evidence. You do not need to see the action itself.
+- **No guessing or speculation**: Only evaluate what is visible. Do not infer intent or missing steps. Do not assume a step was done just because a later one appears.
+- **Only mark failed if clearly attempted and wrong**: A step is failed only if it is visibly attempted and the outcome is wrong or broken. If there is no visible evidence of a step being tried, mark it as invisible.
+- **No step invention**: Only evaluate steps explicitly listed by the user. Do not evaluate or invent unlisted steps.
 
-- **failed**: The step appears to have been attempted, but the result is incorrect, broken, or visibly incomplete.
-
-- **invisible**: The step is not shown, and there is no visual result from it that can reasonably confirm it was done.
-
-**Rules and Guidelines:**
-
-1. **Visible results count**:
-   - If the result of a step is clearly visible (e.g., a specific website or interface is shown), and this result could not appear without completing the step (such as navigating to a URL or clicking a button), you may mark the step as passed even if the triggering action (like typing in a URL) is not shown.
-
-2. **No need to see the address bar**:
-   - Do not require the address bar to be visible. If the content of a known web page, interface, or tool is unmistakably loaded on screen, this is sufficient proof that the correct navigation occurred.
-
-3. **Do not require the triggering action to be visible**:
-   - If the result of an action is clearly visible — such as a specific page, modal, or interface that could only appear by completing a prior step (e.g., clicking a button, navigating to a URL, submitting a form) — you may mark the step as passed, even if the triggering action itself is not shown.
-
-4. **Do not infer user intent**:
-   - Do not guess what might have happened. Only evaluate what is visually evident.
-
-4. **Do not mark as failed unless attempted and wrong**:
-   - Only mark a step as failed if it was clearly attempted and the outcome is incorrect, broken, or visibly incomplete. If there is no visible attempt, use invisible.
-
-6. **No step invention**:
-   - Do not invent or evaluate steps that are not part of the original task. Only assess listed steps.
-
-Only return per-step status with reasoning. Do not summarize, speculate, or assume failure for missing steps.
+✅ Format:
+- Return per-step status with brief reasoning.
+- Do not summarize or speculate.
+- Do not assume failure for steps with no screenshots — just mark them invisible.
   `.trim();
     let messages: any[] = [];
     let runningContext = '';

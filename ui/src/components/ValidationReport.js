@@ -407,15 +407,15 @@ const ValidationReport = ({
                                         <div className="validation-progress-steps">
                                             <div className={`validation-progress-step ${currentAgent === 'test-planner' || currentAgent === null ? 'active' : currentAgent === 'qa-validator' || currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
                                                 <div className="progress-step-icon">🧠</div>
-                                                <p>Planner</p>
+                                                <p>{currentAgent === 'test-planner' ? 'Planning' : currentAgent === 'qa-validator' || currentAgent === 'qa-reviewer' ? 'Planned' : 'Planner'}</p>
                                             </div>
                                             <div className={`validation-progress-step ${currentAgent === 'qa-validator' ? 'active' : currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
                                                 <div className="progress-step-icon">🔍</div>
-                                                <p>Validator</p>
+                                                <p>{currentAgent === 'qa-validator' ? 'Validating' : currentAgent === 'qa-reviewer' ? 'Validated' : 'Validator'}</p>
                                             </div>
                                             <div className={`validation-progress-step ${currentAgent === 'qa-reviewer' ? 'active' : ''}`}>
                                                 <div className="progress-step-icon">🧐</div>
-                                                <p>Reviewer</p>
+                                                <p>{currentAgent === 'qa-reviewer' ? 'Reviewing' : 'Reviewer'}</p>
                                             </div>
                                         </div>
                                     </div>

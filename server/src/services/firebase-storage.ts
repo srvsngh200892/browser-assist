@@ -89,15 +89,39 @@ async function compressScreenshot(base64Image: string): Promise<{ compressedImag
     }
 }
 
-async function calculatePerceptualSimilarity(imageBuffer: Buffer, lastHash?: string): Promise<{ similarity: number, hash: string }> {
+// async function calculatePerceptualSimilarity(imageBuffer: Buffer, lastHash?: string): Promise<{ similarity: number, hash: string }> {
+//     try {
+//         const currentHash = await phash(imageBuffer);
+
+//         if (!lastHash || !lastHash.trim()) {
+//             return { similarity: 0, hash: currentHash };
+//         }
+
+//         const distance = hammingDistance(lastHash, currentHash);
+//         const similarity = 100 - ((distance / 64) * 100);
+
+//         return { similarity, hash: currentHash };
+//     } catch (error) {
+//         console.error('Error calculating perceptual similarity:', error);
+//         return { similarity: 0, hash: '' };
+//     }
+// }
+
+async function calculatePerceptualSimilarity(
+    imageBuffer: Buffer,
+    lastHash?: string
+): Promise<{ similarity: number, hash: string }> {
     try {
-        const currentHash = await phash(imageBuffer);
+        const currentHash = await phash(imageBuffer); // Should return hex string
 
         if (!lastHash || !lastHash.trim()) {
             return { similarity: 0, hash: currentHash };
         }
 
-        const distance = hammingDistance(lastHash, currentHash);
+        const cleanCurrent = currentHash.toLowerCase();
+        const cleanLast = lastHash.toLowerCase();
+
+        const distance = hammingDistance(cleanLast, cleanCurrent);
         const similarity = 100 - ((distance / 64) * 100);
 
         return { similarity, hash: currentHash };
@@ -111,7 +135,7 @@ export async function storeScreenshot(
     sessionId: string,
     base64Image: string,
     lastPerceptualHash?: string,
-    similarityThreshold: number = 80,
+    similarityThreshold: number = 85,
     blankImageThreshold: number = 0.50
 ): Promise<{
     url: string;
@@ -162,18 +186,38 @@ export async function storeScreenshot(
     }
 }
 
+// function hammingDistance(hash1: string, hash2: string): number {
+//     if (!hash1 || !hash2 || hash1.length !== hash2.length) return 64;
+
+//     let distance = 0;
+//     for (let i = 0; i < hash1.length; i++) {
+//         if (hash1[i] !== hash2[i]) {
+//             distance++;
+//         }
+//     }
+//     return distance;
+// }
+
+
 function hammingDistance(hash1: string, hash2: string): number {
     if (!hash1 || !hash2 || hash1.length !== hash2.length) return 64;
 
     let distance = 0;
+
     for (let i = 0; i < hash1.length; i++) {
-        if (hash1[i] !== hash2[i]) {
-            distance++;
+        const n1 = parseInt(hash1[i], 16);
+        const n2 = parseInt(hash2[i], 16);
+        let xor = n1 ^ n2;
+
+        // Count number of differing bits in this nibble
+        while (xor) {
+            distance += xor & 1;
+            xor >>= 1;
         }
     }
+
     return distance;
 }
-
 async function updateScreenshotCount(sessionId: string): Promise<void> {
     try {
         const { updateSessionMetadata, getSessionMetadata } = await import('./firebase-sessions');

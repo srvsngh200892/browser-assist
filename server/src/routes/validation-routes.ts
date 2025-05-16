@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
 import { getSessionMetadata } from '../services/firebase-sessions';
 import { getValidation, updateValidation, createValidation } from '../services/firebase-validation';
-import { validateScreenshots } from '../services/summary-validator';
+import { runValidationAgent } from '../services/validation-agent';
 import { getValidationReportStream, getPdfGenerationStatus, startBackgroundValidationReport } from '../services/pdf-service';
 import axios from 'axios';
 
@@ -341,7 +341,7 @@ router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) 
     const validationResult = await getValidation(sessionId);
     (async () => {
         try {
-            const result = await validateScreenshots(sessionId);
+            const result = await runValidationAgent(sessionId);
             await updateValidation(sessionId, { status: 'completed', result });
         } catch (err) {
             console.error('Validation error:', err);
