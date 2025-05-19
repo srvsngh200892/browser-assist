@@ -363,14 +363,16 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                 validationData.result.steps.forEach((step: { step: string; status: string; explanation: string }, index: number) => {
                     // Calculate text heights
                     const stepTextHeight = doc.heightOfString(step.step, {
-                        width: doc.page.width - 200
+                        width: doc.page.width - 200,
+                        lineGap: 4
                     });
                     const explanationTextHeight = doc.heightOfString(step.explanation, {
-                        width: doc.page.width - 160
+                        width: doc.page.width - 160,
+                        lineGap: 4
                     });
 
-                    // Dynamic height calculation based on content
-                    const stepHeight = Math.max(80, stepTextHeight + explanationTextHeight + 50); // minimum 80px or content height + padding
+                    // Dynamic height calculation based on content - increased padding
+                    const stepHeight = Math.max(100, stepTextHeight + explanationTextHeight + 80); // increased minimum height and padding
 
                     // Check if we need a new page
                     if (currentY + stepHeight > doc.page.height - 50) {
@@ -392,25 +394,25 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                         .rect(50, currentY, 4, stepHeight)
                         .fill();
 
-                    // Step number circle
+                    // Step number circle - adjusted position
                     doc.save()
                         .fillColor('#6b46c1')
-                        .circle(80, currentY + 20, 12)
+                        .circle(80, currentY + 25, 12)
                         .fill()
                         .fillColor('white')
                         .fontSize(12)
-                        .text(stepNumber.toString(), 76, currentY + 14);
+                        .text(stepNumber.toString(), 76, currentY + 19);
 
-                    // Step text
+                    // Step text - increased spacing from top
                     doc.restore()
                         .fontSize(14)
                         .fillColor('#2d3748')
-                        .text(step.step, 105, currentY + 12, {
+                        .text(step.step, 105, currentY + 20, {
                             width: doc.page.width - 200,
-                            lineGap: 4
+                            lineGap: 6
                         });
 
-                    // Status text with appropriate color
+                    // Status text with appropriate color - adjusted position
                     const statusText = step.status === 'passed' ? 'PASSED' :
                         step.status === 'failed' ? 'FAILED' : 'FAILED';
                     const statusColor = step.status === 'passed' ? '#48bb78' :
@@ -418,21 +420,21 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                     doc.font('Helvetica-Bold')
                         .fillColor(statusColor)
                         .fontSize(12)
-                        .text(statusText, doc.page.width - 120, currentY + 14, {
+                        .text(statusText, doc.page.width - 120, currentY + 20, {
                             align: 'center',
                             width: 60
                         });
 
-                    // Explanation text - positioned after step text
+                    // Explanation text - increased spacing from step text
                     doc.font('Helvetica')
                         .fontSize(12)
                         .fillColor('#718096')
-                        .text(step.explanation, 105, currentY + stepTextHeight + 25, {
+                        .text(step.explanation, 105, currentY + stepTextHeight + 40, {
                             width: doc.page.width - 160,
-                            lineGap: 2
+                            lineGap: 4
                         });
 
-                    currentY += stepHeight + 10; // Add spacing between steps
+                    currentY += stepHeight + 15; // Increased spacing between steps
                 });
 
             }
