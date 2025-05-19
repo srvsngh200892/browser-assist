@@ -342,11 +342,12 @@ router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) 
     (async () => {
         try {
             const result = await runValidationAgent(sessionId);
-            await updateValidation(sessionId, { status: 'completed', result });
+            await updateValidation(sessionId, { status: 'completed', result, progress: 100 });
         } catch (err) {
             console.error('Validation error:', err);
             await updateValidation(sessionId, {
                 status: 'error',
+                progress: 100,
                 error: err instanceof Error ? err.message : 'Unknown error',
             });
         }

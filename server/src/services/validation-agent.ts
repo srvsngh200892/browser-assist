@@ -108,6 +108,16 @@ export async function runValidationAgent(sessionId: string): Promise<any> {
       };
     }
 
+    // Calculate total steps for progress tracking
+    const totalBatches = batches.length;
+    let completedBatches = 0;
+
+    // Initial progress update
+    await updateValidation(sessionId, {
+      agent: 'qa-validator',
+      progress: 0
+    });
+
     const systemPrompt = `
 
 You are a QA validator responsible for evaluating a user's claim of completing a multi-step task using partial screenshots as evidence. Your task is to assess only the steps provided by the user without adding, inventing, modifying, or assuming any additional steps.
@@ -200,23 +210,29 @@ You are a QA validator responsible for evaluating a user's claim of completing a
       }
 
       results.push(batchResult);
+
+      // Update progress after each batch
+      completedBatches++;
+      const progress = Math.round((completedBatches / totalBatches) * 100);
+      await updateValidation(sessionId, {
+        progress
+      });
     }
 
     console.log("finalresults", JSON.stringify(runningContext, null, 2));
-
 
     const finalSteps = Object.entries(runningContext).map(([step, { status, reason }]) => ({
       step,
       status,
       explanation: reason,
-    }))
+    }));
 
     const overallStatus = finalSteps.every(s => s.status === 'passed') ? 'Pass' : 'Fail';
 
     return {
       steps: finalSteps,
       finalResult: overallStatus
-    }
+    };
 
 
     //   await updateValidation(sessionId, { agent: 'qa-reviewer' });
