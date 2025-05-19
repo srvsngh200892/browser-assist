@@ -19,7 +19,9 @@ const MCP_SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3003/mcp"
 const MCP_SERVER_BASE_URL = process.env.MCP_SERVER_BASE_URL || "http://localhost:3003";
 
 const DEBUG = process.env.DEBUG === "true";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
+const VALIDATOR_MODEL = process.env.VALIDATOR_MODEL || "gpt-4.1";
+VALIDATOR_MODEL
 const OPENAI_TIMEOUT = process.env.OPENAI_TIMEOUT || 60000;
 
 // Firebase Configuration
@@ -62,6 +64,7 @@ export {
     MCP_SERVER_BASE_URL,
     DEBUG,
     OPENAI_MODEL,
+    VALIDATOR_MODEL,
     OPENAI_TIMEOUT,
     FIREBASE_API_KEY,
     FIREBASE_AUTH_DOMAIN,

@@ -6,6 +6,7 @@ import * as os from 'os';
 import * as path from 'path';
 import axios from 'axios';
 import { getSessionMetadata } from './firebase-sessions';
+import { getValidation } from './firebase-validation';
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -326,6 +327,117 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                     global.gc();
                 }
             } while (batchProcessor.nextBatch());
+        }
+
+        // Add AI Validation Results page
+        try {
+            const validationData = await getValidation(sessionId);
+            if (validationData?.result) {
+                const finalResult = validationData.result.finalResult === 'Pass' ? 'PASSED' : 'FAILED';
+                doc.addPage();
+
+                // Green header background with checkmark - reduced height
+                const headerHeight = 45;
+                doc.save()
+                    .fillColor(validationData.result.finalResult === 'Pass' ? '#48bb78' : '#e53e3e')
+                    .roundedRect(50, 50, doc.page.width - 100, headerHeight, 10)
+                    .fill();
+
+                // Header text - reduced font size
+                doc.fontSize(20)
+                    .fillColor('white')
+                    .font('Helvetica-Bold')
+                    .text(`Validation Result - ${finalResult}`, 50, 50 + (headerHeight - 20) / 2, {
+                        align: 'center',
+                        width: doc.page.width - 100
+                    });
+
+                // Reset fill color and font
+                doc.fillColor('black')
+                    .font('Helvetica');
+
+                // Start steps after header - reduced spacing
+                const startY = 50 + headerHeight + 20;
+                let currentY = startY;
+
+                validationData.result.steps.forEach((step: { step: string; status: string; explanation: string }, index: number) => {
+                    // Calculate text heights
+                    const stepTextHeight = doc.heightOfString(step.step, {
+                        width: doc.page.width - 200
+                    });
+                    const explanationTextHeight = doc.heightOfString(step.explanation, {
+                        width: doc.page.width - 160
+                    });
+
+                    // Dynamic height calculation based on content
+                    const stepHeight = Math.max(80, stepTextHeight + explanationTextHeight + 50); // minimum 80px or content height + padding
+
+                    // Check if we need a new page
+                    if (currentY + stepHeight > doc.page.height - 50) {
+                        doc.addPage();
+                        currentY = 50;
+                    }
+
+                    const stepNumber = index + 1;
+
+                    // White background card with shadow effect
+                    doc.save()
+                        .fillColor('#f8fafc')
+                        .roundedRect(50, currentY, doc.page.width - 100, stepHeight, 8)
+                        .fill();
+
+                    // Left border color based on status
+                    doc.save()
+                        .fillColor(step.status === 'passed' ? '#48bb78' : step.status === 'failed' ? '#e53e3e' : '#e53e3e')
+                        .rect(50, currentY, 4, stepHeight)
+                        .fill();
+
+                    // Step number circle
+                    doc.save()
+                        .fillColor('#6b46c1')
+                        .circle(80, currentY + 20, 12)
+                        .fill()
+                        .fillColor('white')
+                        .fontSize(12)
+                        .text(stepNumber.toString(), 76, currentY + 14);
+
+                    // Step text
+                    doc.restore()
+                        .fontSize(14)
+                        .fillColor('#2d3748')
+                        .text(step.step, 105, currentY + 12, {
+                            width: doc.page.width - 200,
+                            lineGap: 4
+                        });
+
+                    // Status text with appropriate color
+                    const statusText = step.status === 'passed' ? 'PASSED' :
+                        step.status === 'failed' ? 'FAILED' : 'FAILED';
+                    const statusColor = step.status === 'passed' ? '#48bb78' :
+                        step.status === 'failed' ? '#e53e3e' : '#e53e3e';
+                    doc.font('Helvetica-Bold')
+                        .fillColor(statusColor)
+                        .fontSize(12)
+                        .text(statusText, doc.page.width - 120, currentY + 14, {
+                            align: 'center',
+                            width: 60
+                        });
+
+                    // Explanation text - positioned after step text
+                    doc.font('Helvetica')
+                        .fontSize(12)
+                        .fillColor('#718096')
+                        .text(step.explanation, 105, currentY + stepTextHeight + 25, {
+                            width: doc.page.width - 160,
+                            lineGap: 2
+                        });
+
+                    currentY += stepHeight + 10; // Add spacing between steps
+                });
+
+            }
+        } catch (error) {
+            console.error('Error adding validation results to PDF:', error);
         }
 
         updatePdfGenerationProgress(sessionId, 95, 'Finalizing document');
