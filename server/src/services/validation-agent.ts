@@ -28,15 +28,16 @@ async function reviewUserIntentAgent(sessionId: string) {
   
     # Instructions:
     1. Write each step as a short, specific sentence, starting with a verb.
-    2. Include only **explicit UI actions** (e.g. "clicked a button") and **critical resulting states** (e.g. "language changed", "something created/updated/deleted").
-    3. Break down every instruction with multiple UI actions into separate steps, even if they are in the same sentence.
-    4. The only exception is if the actions are part of a single atomic flow (e.g., "create user and save" or "fill out form and submit"), in which case do not break.
-    4. Do not infer, expand, or assume any context. Only include actions literally stated in the input.
-    5. Ignore casual messages, greetings, or repeated confirmations.
-    7. Preserve the original order of the instructions.
-    8. Do **not summarize** — extract one step per line, and **preserve order**.
-    9. Number each step clearly. Your output will be used to validate against screenshots.
-    10. Do not summarize.
+    2. Mask credentials/sensitive information or remove them.
+    3. Include only **explicit UI actions** (e.g. "clicked a button") and **critical resulting states** (e.g. "language changed", "something created/updated/deleted").
+    4. Break down every instruction with multiple UI actions into separate steps, even if they are in the same sentence.
+    5. The only exception is if the actions are part of a single atomic flow (e.g., "create user and save" or "fill out form and submit"), in which case do not break.
+    6. Do not infer, expand, or assume any context. Only include actions literally stated in the input.
+    7. Ignore casual messages, greetings, or repeated confirmations.
+    8. Preserve the original order of the instructions.
+    9. Do **not summarize** — extract one step per line, and **preserve order**.
+    10. Number each step clearly. Your output will be used to validate against screenshots.
+    11. Do not summarize.
   
     # ⚠️ Example (what NOT to do):
     Input: "1. go to https://youtube.com"
@@ -177,7 +178,7 @@ You are a QA validator responsible for evaluating a user's claim of completing a
       const response = await openaiClient.chat.completions.create({
         model: VALIDATOR_MODEL,
         messages: messages as any,
-        max_tokens: 1000,
+        max_tokens: 10000,
       });
       const batchResult = response.choices[0].message.content || '{}';
       let parsedBatchResult;
