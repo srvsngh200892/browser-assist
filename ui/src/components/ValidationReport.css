@@ -392,12 +392,112 @@
 .validation-ai-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    position: relative;
+    justify-content: space-between;
+}
+
+.validation-ai-header .left-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.validation-ai-icon {
+    font-size: 28px;
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tooltip {
+    visibility: hidden;
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    position: absolute;
+    z-index: 1;
+    bottom: 140%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.tooltip-wrapper:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.retry-button {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: rgba(0, 0, 0, 0.8);
+    margin-left: auto;
+    width: 32px;
+    height: 32px;
+}
+
+.retry-button:hover {
+    background: #ffffff;
+    transform: rotate(180deg);
+    color: rgba(0, 0, 0, 1);
+}
+
+.retry-button:active {
+    transform: rotate(180deg) scale(0.95);
+}
+
+.retry-button svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Remove the hover scale effect on the SVG */
+.retry-button:hover svg {
+    transform: none;
+}
+
+.retry-button:active {
+    transform: rotate(180deg) scale(0.95);
 }
 
 .validation-ai-header.pass {
@@ -410,19 +510,6 @@
 
 .validation-ai-header.incomplete {
     background: linear-gradient(135deg, #718096 0%, #4A5568 100%);
-}
-
-.validation-ai-icon {
-    font-size: 24px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    color: white;
 }
 
 .validation-ai-header h4 {
@@ -582,14 +669,16 @@
 }
 
 .step-status {
-    font-size: 20px;
-    width: 24px;
-    height: 24px;
+    font-size: 22px;
+    font-weight: bold;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.05);
+    font-family: Arial, sans-serif;
 }
 
 .validation-step.passed .step-status {

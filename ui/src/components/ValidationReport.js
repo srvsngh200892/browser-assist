@@ -394,29 +394,55 @@ const ValidationReport = ({
                             <div className="validation-ai-section">
                                 {aiValidationResult && (
                                     <div className={`validation-ai-header ${aiValidationResult.finalResult.toLowerCase()}`}>
-                                        <span className="validation-ai-icon">
-                                            {aiValidationResult.finalResult === 'Pass' ? '✓' :
-                                                aiValidationResult.finalResult === 'Fail' ? '✕' : '?'}
-                                        </span>
-                                        <h4>AI Validation Results</h4>
+                                        <div className="left-section">
+                                            <span className="validation-ai-icon">
+                                                {aiValidationResult.finalResult === 'Pass' ? '✓' :
+                                                    aiValidationResult.finalResult === 'Fail' ? '×' : '?'}
+                                            </span>
+                                            <h4>Validation Results</h4>
+                                        </div>
+                                        {aiValidationResult.finalResult === 'Fail' && (
+                                            <div className="tooltip-wrapper">
+                                                <button
+                                                    className="retry-button"
+                                                    onClick={() => startAiValidation()}
+                                                    aria-label="Retry validation"
+                                                >
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <path d="M 12 20 A 8 8 0 1 0 4.5 8.5 L 4.5 12" fill="none" />
+                                                        <path d="M 4.5 8.5 L 1 12 L 8 12" fill="currentColor" stroke="none" />
+                                                    </svg>
+                                                </button>
+                                                <span className="tooltip">Retry validation</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
                                 {aiValidating && (
                                     <div className="ai-validation-progress">
                                         <div className="validation-progress-steps">
-                                            <div className={`validation-progress-step ${currentAgent === 'test-planner' || currentAgent === null ? 'active' : currentAgent === 'qa-validator' || currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
+                                            <div className={`validation-progress-step ${currentAgent === 'test-planner' || currentAgent === null ? 'active' : currentAgent === 'qa-validator' ? 'completed' : ''}`}>
                                                 <div className="progress-step-icon">🧠</div>
-                                                <p>{currentAgent === 'test-planner' ? 'Planning' : currentAgent === 'qa-validator' || currentAgent === 'qa-reviewer' ? 'Planned' : 'Planner'}</p>
+                                                <p>{currentAgent === 'test-planner' ? 'Planning' : currentAgent === 'qa-validator' ? 'Planned' : 'Planner'}</p>
                                             </div>
-                                            <div className={`validation-progress-step ${currentAgent === 'qa-validator' ? 'active' : currentAgent === 'qa-reviewer' ? 'completed' : ''}`}>
+                                            <div className={`validation-progress-step ${currentAgent === 'qa-validator' ? 'active' : ''}`}>
                                                 <div className="progress-step-icon">🔍</div>
-                                                <p>{currentAgent === 'qa-validator' ? 'Validating' : currentAgent === 'qa-reviewer' ? 'Validated' : 'Validator'}</p>
+                                                <p>{currentAgent === 'qa-validator' ? 'Validating' : 'Validator'}</p>
                                             </div>
-                                            <div className={`validation-progress-step ${currentAgent === 'qa-reviewer' ? 'active' : ''}`}>
+                                            {/* <div className={`validation-progress-step ${currentAgent === 'qa-reviewer' ? 'active' : ''}`}>
                                                 <div className="progress-step-icon">🧐</div>
                                                 <p>{currentAgent === 'qa-reviewer' ? 'Reviewing' : 'Reviewer'}</p>
-                                            </div>
+                                            </div> */}
                                         </div>
                                     </div>
                                 )}
@@ -437,7 +463,7 @@ const ValidationReport = ({
                                                         <span className="step-title">{step.step}</span>
                                                         <span className="step-status">
                                                             {step.status === 'passed' ? '✓' :
-                                                                step.status === 'failed' ? '✕' : '?'}
+                                                                step.status === 'failed' ? '×' : '?'}
                                                         </span>
                                                     </div>
                                                     <div className="step-explanation">
