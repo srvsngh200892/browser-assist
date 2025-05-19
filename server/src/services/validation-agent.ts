@@ -154,7 +154,7 @@ You are a QA validator responsible for evaluating a user's claim of completing a
       const images = batch.map((buf) => ({
         type: 'image_url' as const,
         image_url: {
-          url: `data: image / jpeg; base64, ${buf.toString('base64')} `,
+          url: `data:image/jpeg;base64,${buf.toString('base64')}`,
         },
       }));
       const contextText = formatContextAsText(runningContext);
@@ -170,7 +170,6 @@ You are a QA validator responsible for evaluating a user's claim of completing a
           ],
         },
       ];
-
 
       const response = await openaiClient.chat.completions.create({
         model: VALIDATOR_MODEL,
