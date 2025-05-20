@@ -184,53 +184,15 @@ const ValidationReport = ({
         }
     };
 
-    // Start AI validation process
-    const startAiValidation = async () => {
-        if (!sessionId || aiValidating) return;
-
-        try {
-            setAiValidating(true);
-            setAiValidationError(null);
-            setAiValidationResult(null);
-            setDownloadUrl(null); // Reset any existing download URL
-
-            const response = await api.post(ENDPOINTS.VALIDATE_VIA_AI, {
-                sessionId: sessionId
-            });
-
-            if (response.data.success) {
-                // Start polling for AI validation status
-                if (aiPollInterval) {
-                    clearInterval(aiPollInterval);
-                }
-
-                const interval = setInterval(checkAiValidationStatus, 1500); //poll every 1.5 seconds
-                setAiPollInterval(interval);
-
-                // Initial status update
-                setAiValidationStatus('processing');
-                setCurrentAgent(response.data.agent);
-            } else {
-                setAiValidationError('Failed to start AI validation');
-                setAiValidating(false);
-            }
-        } catch (err) {
-            console.error('Error starting AI validation:', err);
-            setAiValidationError(`Error: ${err.message}`);
-            setAiValidating(false);
-            if (onError) onError(err.message);
-        }
-    };
-
     // Check AI validation status and trigger report generation when complete
     const checkAiValidationStatus = async () => {
         if (!sessionId) return;
 
         try {
             const response = await api.get(ENDPOINTS.GET_VALIDATE_VIA_AI_STATUS(sessionId));
-            const { status, result, error, agent } = response.data;
+            const { status, result, error, agent, progress } = response.data;
 
-            setAiValidationStatus(status);
+            setAiValidationStatus({ status, progress });
             setCurrentAgent(agent);
 
             if (error) {
@@ -260,6 +222,45 @@ const ValidationReport = ({
             setAiPollInterval(null);
             setAiValidating(false);
             setCurrentAgent(null);
+            if (onError) onError(err.message);
+        }
+    };
+
+    // Start AI validation process
+    const startAiValidation = async () => {
+        if (!sessionId || aiValidating) return;
+
+        try {
+            setAiValidating(true);
+            setAiValidationError(null);
+            setAiValidationResult(null);
+            setAiValidationStatus({ status: 'processing', progress: 0 });
+            setDownloadUrl(null); // Reset any existing download URL
+
+            const response = await api.post(ENDPOINTS.VALIDATE_VIA_AI, {
+                sessionId: sessionId
+            });
+
+            if (response.data.success) {
+                // Start polling for AI validation status
+                if (aiPollInterval) {
+                    clearInterval(aiPollInterval);
+                }
+
+                const interval = setInterval(checkAiValidationStatus, 1500); //poll every 1.5 seconds
+                setAiPollInterval(interval);
+
+                // Initial status update
+                setAiValidationStatus({ status: 'processing', progress: 0 });
+                setCurrentAgent(response.data.agent);
+            } else {
+                setAiValidationError('Failed to start AI validation');
+                setAiValidating(false);
+            }
+        } catch (err) {
+            console.error('Error starting AI validation:', err);
+            setAiValidationError(`Error: ${err.message}`);
+            setAiValidating(false);
             if (onError) onError(err.message);
         }
     };
@@ -437,12 +438,19 @@ const ValidationReport = ({
                                             </div>
                                             <div className={`validation-progress-step ${currentAgent === 'qa-validator' ? 'active' : ''}`}>
                                                 <div className="progress-step-icon">🔍</div>
-                                                <p>{currentAgent === 'qa-validator' ? 'Validating' : 'Validator'}</p>
+                                                <div className="validation-step-content">
+                                                    <p>{currentAgent === 'qa-validator' ? 'Validating' : 'Validator'}</p>
+                                                    {currentAgent === 'qa-validator' && aiValidationStatus?.progress !== undefined && (
+                                                        <div className="validation-progress-bar-container">
+                                                            <div
+                                                                className="validation-progress-bar"
+                                                                style={{ width: `${aiValidationStatus.progress}%` }}
+                                                            />
+                                                            <span className="validation-progress-text">{aiValidationStatus.progress}%</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            {/* <div className={`validation-progress-step ${currentAgent === 'qa-reviewer' ? 'active' : ''}`}>
-                                                <div className="progress-step-icon">🧐</div>
-                                                <p>{currentAgent === 'qa-reviewer' ? 'Reviewing' : 'Reviewer'}</p>
-                                            </div> */}
                                         </div>
                                     </div>
                                 )}
