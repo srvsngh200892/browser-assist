@@ -121,7 +121,7 @@ router.get("/screenshot", authMiddleware, async (req: AuthenticatedRequest, res:
                 <path d="M400,135 v50 M375,160 h50" stroke="#ffffff" stroke-width="4" />
                 
                 <!-- Welcome Text -->
-                <text x="400" y="230" font-family="Arial" font-size="24" font-weight="bold" fill="#202124" text-anchor="middle">Welcome to Browse Assist</text>
+                <text x="400" y="230" font-family="Arial" font-size="24" font-weight="bold" fill="#202124" text-anchor="middle">Welcome to Browser Assist</text>
                 <text x="400" y="260" font-family="Arial" font-size="16" fill="#5f6368" text-anchor="middle">Your intelligent browser automation companion</text>
                 
                 <!-- Search bar -->
@@ -163,16 +163,16 @@ router.get("/browser-stream/:sessionId", authMiddleware, async (req: Request, re
         return res.status(401).end();
     }
 
-    const intervalId = setInterval(async() => {
+    const intervalId = setInterval(async () => {
         if (!sessionData) {
-          console.log('clossing the stream as no session id found')
-          res.write(`event: end\ndata: session ended\n\n`);
-          res.end();
-          clearInterval(intervalId);
-          return;
+            console.log('clossing the stream as no session id found')
+            res.write(`event: end\ndata: session ended\n\n`);
+            res.end();
+            clearInterval(intervalId);
+            return;
         }
         res.write(`data: ${JSON.stringify({ timestamp: new Date() })}\n\n`);
-      }, 30000);
+    }, 30000);
 
     console.log(`creating new stream for session ${sessionId}`)
     // Set headers for SSE
