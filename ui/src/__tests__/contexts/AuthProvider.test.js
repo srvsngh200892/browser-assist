@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import { AuthProvider, AuthContext } from '../../contexts/AuthProvider';
 import api from '../../api';
 import { ENDPOINTS } from '../../constants';
