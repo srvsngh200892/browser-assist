@@ -219,6 +219,38 @@ export async function getLastMessage(sessionId: string): Promise<MessageType | n
     return content as MessageType;
 }
 
+export async function getAllUserMessage(sessionId: string): Promise<MessageType[]> {
+    const query = await db.collection(MESSAGES_COLLECTION)
+        .where("sessionId", "==", sessionId)
+        .where("role", "==", "user")
+        .orderBy("timestamp", "asc")
+
+    const snapshot = await query.get();
+    const messages: MessageType[] = [];
+    let totalSize = 0;
+
+    for (const doc of snapshot.docs) {
+        const data = doc.data();
+        let msg: MessageType;
+        if (data.isChunked) {
+            try {
+                msg = await getChunkedMessage(data.messageId, data);
+            } catch {
+                continue;
+            }
+        } else {
+            const { timestamp, messageId, sessionId, ...content } = data;
+            msg = content as MessageType;
+        }
+
+        const size = estimateMessageSize(msg);
+        if (totalSize + size > MAX_PAYLOAD_SIZE) break;
+        messages.push(msg);
+        totalSize += size;
+    }
+    return messages;
+}
+
 export async function getLastAssistantMessage(sessionId: string): Promise<MessageType | null> {
     const snapshot = await db.collection(MESSAGES_COLLECTION)
         .where("sessionId", "==", sessionId)

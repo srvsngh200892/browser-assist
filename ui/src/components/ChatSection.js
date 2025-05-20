@@ -1,26 +1,26 @@
-import React, {useState, useRef, useEffect, useCallback} from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Message from './Message';
 import ValidationReport from './ValidationReport';
 import ScrollToBottomButton from "./ScrollToBottomButton";
 
 function ChatSection({
-                         messages,
-                         loading,
-                         showTechnicalMessages,
-                         sessionId,
-                         hasScreenshots,
-                         screenshotCount,
-                         addStatusMessage,
-                         handleSendMessage,
-                         toggleTechnicalMessages,
-                         typingMessageIds,
-                         messagesEndRef,
-                         chatContainerRef,
-                         inputRef,
-                         showScrollButton,
-                         scrollToBottom,
-                         handleChatScroll,
-                     }) {
+    messages,
+    loading,
+    showTechnicalMessages,
+    sessionId,
+    hasScreenshots,
+    screenshotCount,
+    addStatusMessage,
+    handleSendMessage,
+    toggleTechnicalMessages,
+    typingMessageIds,
+    messagesEndRef,
+    chatContainerRef,
+    inputRef,
+    showScrollButton,
+    scrollToBottom,
+    handleChatScroll,
+}) {
 
     const [inputValue, setInputValue] = useState('');
     const handleInputChange = (value) => {
@@ -29,7 +29,7 @@ function ChatSection({
     return (
         <div className="chat-section">
             <div className="chat-header">
-                <h2>Chat</h2>
+                <h2>Chat </h2>
                 <div className="chat-controls">
                     <button
                         className="toggle-technical-button"
@@ -68,7 +68,7 @@ function ChatSection({
                             showTechnicalMessages={showTechnicalMessages}
                         />
                     ))}
-                <ScrollToBottomButton showScrollButton={showScrollButton} scrollToBottom={scrollToBottom}/>
+                <ScrollToBottomButton showScrollButton={showScrollButton} scrollToBottom={scrollToBottom} />
                 <div ref={messagesEndRef} />
             </div>
             <div className="input-container">

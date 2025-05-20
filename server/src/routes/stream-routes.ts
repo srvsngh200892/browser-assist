@@ -243,7 +243,7 @@ router.get("/browser-stream/:sessionId", authMiddleware, async (req: Request, re
                 resumedAt: 0,
                 lastScreenshotAt: 0,
                 lastPerceptualHash: '',
-                similarityThreshold: 80, // Default 80% similarity threshold
+                similarityThreshold: 85, // Default 80% similarity threshold
                 minScreenshotInterval: 2000, // Default 2 seconds between screenshots
                 blankImageThreshold: 0.50 // Default threshold for blank image detection
             };

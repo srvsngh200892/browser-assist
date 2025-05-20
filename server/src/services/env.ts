@@ -16,6 +16,7 @@ import {
     FIRESTORE_MAX_PAYLOAD_SIZE,
     DEBUG,
     OPENAI_MODEL,
+    VALIDATOR_MODEL,
     OPENAI_TIMEOUT
 } from "../config/env";
 
@@ -36,5 +37,6 @@ export {
     FIRESTORE_MAX_PAYLOAD_SIZE,
     DEBUG,
     OPENAI_MODEL,
-    OPENAI_TIMEOUT
+    OPENAI_TIMEOUT,
+    VALIDATOR_MODEL
 }; 

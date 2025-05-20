@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware.js';
 import { getSessionMetadata, updateSessionActivity, getMessageHandler, updatelastMessageRetrieval } from '../services/firebase-sessions';
 import { getNewMessages, getSessionMessagesForUI } from '../services/firebase-messages';
-import { processResponse } from '../services/response-processor';
+import { runNavigationAgent } from '../services/navigationAgent.js';
 import { toMillis } from '../utils/firebase-date-to-milli';
 
 // Define a custom interface for working with tool calls
@@ -97,7 +97,7 @@ router.get("/messages/:sessionId", authMiddleware, async (req: AuthenticatedRequ
         }
 
         // Update the last retrieval time
-         await updatelastMessageRetrieval(sessionId);
+        await updatelastMessageRetrieval(sessionId);
         const sessionInfo = await getSessionMetadata(sessionId);
 
         return res.json({
@@ -176,7 +176,7 @@ router.post("/chat/:sessionId", authMiddleware, async (req: AuthenticatedRequest
         });
 
         // Start async response processing
-        processResponse(sessionId, messageHandler).catch(error => {
+        runNavigationAgent(sessionId, messageHandler).catch(error => {
             console.error(`Error processing response: ${error instanceof Error ? error.message : "Unknown error"}`);
         });
 

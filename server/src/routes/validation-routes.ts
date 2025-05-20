@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
 import { getSessionMetadata } from '../services/firebase-sessions';
+import { getValidation, updateValidation, createValidation } from '../services/firebase-validation';
+import { runValidationAgent } from '../services/validation-agent';
 import { getValidationReportStream, getPdfGenerationStatus, startBackgroundValidationReport } from '../services/pdf-service';
 import axios from 'axios';
 
@@ -319,6 +321,57 @@ router.post('/validation/download-from-storage', authMiddleware, async (req: any
             error: 'Failed to download file'
         });
     }
+});
+
+
+router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) => {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
+
+    // Verify session exists and belongs to the user
+    const sessionData = await getSessionMetadata(sessionId);
+    if (!sessionData) {
+        return res.status(404).json({
+            success: false,
+            error: 'Session not found'
+        });
+    }
+
+    await createValidation(sessionId);
+    const validationResult = await getValidation(sessionId);
+    (async () => {
+        try {
+            const result = await runValidationAgent(sessionId);
+            await updateValidation(sessionId, { status: 'completed', result });
+        } catch (err) {
+            console.error('Validation error:', err);
+            await updateValidation(sessionId, {
+                status: 'error',
+                error: err instanceof Error ? err.message : 'Unknown error',
+            });
+        }
+    })();
+    res.json({
+        success: true,
+        status: "processing",
+        message: "Validation started.",
+        agent: validationResult?.agent || 'test-planner'
+    });
+});
+
+router.get('/validate-via-ai/:sessionId', authMiddleware, async (req: any, res: Response) => {
+    const { sessionId } = req.params;
+    const sessionData = await getSessionMetadata(sessionId);
+    if (!sessionData) {
+        return res.status(404).json({
+            success: false,
+            error: 'Session not found'
+        });
+    }
+    const doc = await getValidation(sessionId);
+    if (!doc) return res.status(404).json({ error: 'Validation not found' });
+
+    res.json(doc);
 });
 
 export default router; 

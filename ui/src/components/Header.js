@@ -3,7 +3,7 @@ import React from 'react';
 function Header({ togglePreview, previewVisible, pingServer, user, handleLogout }) {
     return (
       <header className="app-header">
-        <h1>🤖 Browse Assist</h1>
+        <h1>🤖 Browser Assist</h1>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
             className="toggle-preview-button"

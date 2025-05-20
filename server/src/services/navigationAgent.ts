@@ -31,7 +31,7 @@ import { OPENAI_MODEL, OPENAI_TIMEOUT } from './env';
 
 
 export // Function to process responses asynchronously
-    async function processResponse(sessionId: string, messageHandler: MessageHandler) {
+    async function runNavigationAgent(sessionId: string, messageHandler: MessageHandler) {
     try {
         await updateSessionMetadata(sessionId, {
             messageProcessing: true
@@ -40,7 +40,7 @@ export // Function to process responses asynchronously
         const maxIterations = Number.MAX_SAFE_INTEGER;
         const mcpClient = await getMcpClient(sessionId);
         let mcpToolsList: any = await mcpClient.listTools();
-        console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length}`);
+        console.log(`MCP Tools list for session ${sessionId}: ${mcpToolsList.length} ${OPENAI_MODEL}`);
         let toolsArray = Array.isArray(mcpToolsList.tools) ? mcpToolsList.tools : [];
         toolsArray = toolsArray.filter((tool: any) => tool.name !== 'browser_take_screenshot');
         const openAiTools = mapToolListToOpenAiTools({ tools: toolsArray });
@@ -108,7 +108,7 @@ export // Function to process responses asynchronously
                 await messageHandler.addMessage(assistantMessage);
 
                 if (isDone(response)) {
-                    console.log(`Agent loop is Done for session ${sessionId}`);
+                    console.log(`Agent loop is Done for session ${sessionId}, ${JSON.stringify(response,null,2)}`);
                     break;
                 }
 
