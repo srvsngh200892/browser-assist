@@ -14,7 +14,14 @@
         "start": "PORT=3002 react-scripts start",
         "build": "react-scripts build",
         "test": "react-scripts test",
-        "eject": "react-scripts eject"
+        "eject": "react-scripts eject",
+        "prepare": "cd .. && husky install ui/.husky",
+        "test:staged": "react-scripts test --watchAll=false --findRelatedTests"
+    },
+    "lint-staged": {
+        "src/**/*.{js,jsx,ts,tsx}": [
+            "npm run test:staged"
+        ]
     },
     "eslintConfig": {
         "extends": [
@@ -39,6 +46,8 @@
         "@testing-library/react": "^13.4.0",
         "@testing-library/user-event": "^13.5.0",
         "http-proxy-middleware": "^3.0.3",
+        "husky": "^8.0.3",
+        "lint-staged": "^15.5.2",
         "playwright-webkit": "^1.51.1"
     }
 }
