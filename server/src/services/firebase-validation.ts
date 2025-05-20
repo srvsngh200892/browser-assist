@@ -30,11 +30,12 @@ type ValidationData = {
     result: ValidationResult | null;
     agent: 'test-planner' | 'qa-validator' | 'qa-reviewer';
     error: any;
+    progress?: number;
 };
 
 export async function createValidation(sessionId: string) {
     const validationRef = await db.collection(VALIDATIONS_VIA_AI_COLLECTION).doc(sessionId);
-    const initialData: ValidationData = { status: 'pending', result: null, error: null, agent: 'test-planner' };
+    const initialData: ValidationData = { status: 'pending', result: null, error: null, agent: 'test-planner', progress: 0 };
     await validationRef.set(initialData, { merge: true });
 }
 

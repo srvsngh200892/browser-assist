@@ -47,7 +47,7 @@ function ChatSection({
                     )}
                 </div>
             </div>
-            <div className="chat-container" ref={chatContainerRef} onScroll={handleChatScroll}>
+            <div className="chat-container" ref={chatContainerRef} onScroll={handleChatScroll} data-testid="chat-container">
                 {messages
                     .filter(message => {
                         if (!showTechnicalMessages) {

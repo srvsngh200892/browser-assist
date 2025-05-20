@@ -2,7 +2,7 @@ import axios from 'axios';
 import { ENDPOINTS } from '../constants';
 
 const api = axios.create({
-  baseURL:  process.env.REACT_APP_SERVER_URL, // adjust as needed
+  baseURL: process.env.REACT_APP_SERVER_URL, // adjust as needed
   withCredentials: true, // send cookies (access & refresh tokens)
 });
 
