@@ -49,7 +49,7 @@ function Message({ key, message, isTyping, typingMessageIds, showTechnicalMessag
             <div className="message-content">
                 {isTyping ? (
                     <div className="typing-message-container">
-                        <div className="typing-indicator">
+                        <div className="typing-indicator" data-testid="typing-indicator">
                             <div className="typing-dot"></div>
                             <div className="typing-dot"></div>
                             <div className="typing-dot"></div>

@@ -73,10 +73,20 @@ const SessionInfo = ({ sessionId, onError }) => {
         const then = new Date(timestamp._seconds * 1000);
         const diffInSeconds = Math.floor((now - then) / 1000);
 
-        if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-        return `${Math.floor(diffInSeconds / 86400)} days ago`;
+        if (diffInSeconds < 60) {
+            const seconds = diffInSeconds;
+            return `${seconds} ${seconds === 1 ? 'second' : 'seconds'} ago`;
+        }
+        if (diffInSeconds < 3600) {
+            const minutes = Math.floor(diffInSeconds / 60);
+            return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+        }
+        if (diffInSeconds < 86400) {
+            const hours = Math.floor(diffInSeconds / 3600);
+            return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+        }
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days} ${days === 1 ? 'day' : 'days'} ago`;
     };
 
     // Format elapsed time between two timestamps
@@ -168,7 +178,7 @@ const SessionInfo = ({ sessionId, onError }) => {
         <div className={`session-info ${expanded ? 'expanded' : 'collapsed'}`}>
             <div className="session-info-header" onClick={toggleExpand}>
                 <div className="session-info-header-left">
-                    <div className={`session-status-indicator ${isActive ? 'active' : 'inactive'}`}></div>
+                    <div className={`session-status-indicator ${isActive ? 'active' : 'inactive'}`} data-testid="status-indicator"></div>
                     <h3>Session Information</h3>
                 </div>
                 <span className="session-info-toggle">{expanded ? '▼' : '▶'}</span>
@@ -178,7 +188,7 @@ const SessionInfo = ({ sessionId, onError }) => {
                 <div className="session-info-content">
                     <div className="session-info-item">
                         <span className="session-info-label">User Email:</span>
-                    <span className="session-info-value">{sessionData?.user?.email}</span>
+                        <span className="session-info-value">{sessionData?.user?.email}</span>
                     </div>
 
                     <div className="session-info-item">

@@ -19,27 +19,29 @@ export const AuthProvider = ({ children }) => {
   // Logout logic
   const handleLogout = useCallback((deleteData = true) => {
     const currentSessionId = sessionId;
-    if (currentSessionId) {
-      api.post(ENDPOINTS.LOGOUT, {
-        sessionId: currentSessionId,
-        deleteData: !!deleteData
-      })
-        .then(() => {
-          console.log('Logout successful');
-          setIsAuthenticated(false);
-          setUser(null);
-          setSessionId(null);
-          localStorage.clear();
-          // Redirect user to the login page or home after logout
-          setTimeout(() => {
-            window.location.href = window.location.origin; // more reliable than reload()
-          }, 50);
-        })
-        .catch((error) => {
-          console.error('Logout error:', error);
-          throw error;
-        });
+    if (!currentSessionId) {
+      return Promise.resolve();
     }
+
+    return api.post(ENDPOINTS.LOGOUT, {
+      sessionId: currentSessionId,
+      deleteData: !!deleteData
+    })
+      .then(() => {
+        console.log('Logout successful');
+        setIsAuthenticated(false);
+        setUser(null);
+        setSessionId(null);
+        localStorage.clear();
+        // Redirect user to the login page or home after logout
+        setTimeout(() => {
+          window.location.href = window.location.origin; // more reliable than reload()
+        }, 50);
+      })
+      .catch((error) => {
+        console.error('Logout error:', error);
+        throw error;
+      });
   }, [sessionId]);
 
 

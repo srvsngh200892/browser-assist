@@ -50,31 +50,23 @@ const ValidationReport = ({
         try {
             setLoading(true);
             const response = await api.get(ENDPOINTS.GET_VALIDATION_REPORT_STATUS(sessionId));
+            const { status, downloadUrl, progress, estimatedTimeSeconds } = response.data;
 
-            if (response.data.success) {
-                setStatus(response.data);
-                setProgress(response.data.progress || 0);
-
-                // Store download URL if available
-                if (response.data.downloadUrl) {
-                    setDownloadUrl(response.data.downloadUrl);
-                }
-
-                // If report generation is complete or failed, stop polling
-                if (response.data.status === 'completed' || response.data.status === 'failed') {
-                    clearInterval(pollInterval);
-                    setPollInterval(null);
-
-                    setGenerating(false);
-
-                    if (response.data.status === 'failed') {
-                        setError(`Report generation failed: ${response.data.error || 'Unknown error'}`);
-                    } else {
-                        setError(null);
-                    }
-                }
+            if (status === 'completed' && downloadUrl) {
+                setStatus({ status, downloadUrl });
+                setProgress(100);
+                setDownloadUrl(downloadUrl);
+                setGenerating(false);
+                clearInterval(pollInterval);
+                setPollInterval(null);
+            } else if (status === 'failed') {
+                setError('Report generation failed');
+                setGenerating(false);
+                clearInterval(pollInterval);
+                setPollInterval(null);
             } else {
-                setError('Failed to check report status');
+                setStatus({ status, estimatedTimeSeconds });
+                setProgress(progress || 0);
             }
         } catch (err) {
             console.error('Error checking report status:', err);
@@ -443,6 +435,7 @@ const ValidationReport = ({
                                                     {currentAgent === 'qa-validator' && aiValidationStatus?.progress !== undefined && (
                                                         <div className="validation-progress-bar-container">
                                                             <div
+                                                                data-testid="validation-progress-bar"
                                                                 className="validation-progress-bar"
                                                                 style={{ width: `${aiValidationStatus.progress}%` }}
                                                             />

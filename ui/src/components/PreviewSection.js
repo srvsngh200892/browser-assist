@@ -2,19 +2,19 @@ import React from 'react';
 import StatusLog from './StatusLog';
 
 function PreviewSection({
-                           previewVisible,
-                           browserImage,
-                           streaming,
-                           streamStatus,
-                           sessionId,
-                           takeScreenshot,
-                           startStream,
-                           stopStream,
-                           restartStream,
-                           statusMessages
-                       }) {
+    previewVisible,
+    browserImage,
+    streaming,
+    streamStatus,
+    sessionId,
+    takeScreenshot,
+    startStream,
+    stopStream,
+    restartStream,
+    statusMessages
+}) {
     return (
-        <div className={`preview-section ${previewVisible ? '' : 'hidden'}`}>
+        <div className={`preview-section ${previewVisible ? '' : 'hidden'}`} data-testid="preview-section">
             <div className="preview-title">
                 <h2>Live Preview</h2>
                 <div className="preview-controls">
@@ -34,7 +34,10 @@ function PreviewSection({
                     </button>
                 </div>
             </div>
-            <div className={`stream-status ${streamStatus} ${(streamStatus === 'active' || streamStatus === 'waiting') ? 'pulsing' : ''}`}>
+            <div
+                className={`stream-status ${streamStatus} ${(streamStatus === 'active' || streamStatus === 'waiting') ? 'pulsing' : ''}`}
+                data-testid="stream-status"
+            >
                 Stream Status: {streamStatus.charAt(0).toUpperCase() + streamStatus.slice(1)}
             </div>
             <div className="browser-preview">
