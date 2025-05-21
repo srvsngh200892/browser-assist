@@ -149,6 +149,7 @@ export async function runValidationAgent(sessionId: string): Promise<any> {
     const systemPrompt = `
 
 You are a QA validator responsible for evaluating a user's claim of completing a multi-step task using partial screenshots as evidence. Your task is to assess only the steps provided by the user without adding, inventing, modifying, or assuming any additional steps.
+Do not make assumptions about the content beyond UI-level validation. Ignore any sensitive, personal, or ambiguous content. Do not generate or infer any inappropriate or personal information.
 
 # ✅ Evaluation Rules:
 - For each task step, assign one of the following statuses based solely on the visual evidence in the screenshots:
