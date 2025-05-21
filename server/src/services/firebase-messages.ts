@@ -6,6 +6,7 @@ import {
     FieldValue,
 } from "firebase-admin/firestore";
 import { v4 as uuid } from "uuid";
+import admin from 'firebase-admin';
 
 import {
     USE_FIREBASE_EMULATOR,
@@ -219,11 +220,16 @@ export async function getLastMessage(sessionId: string): Promise<MessageType | n
     return content as MessageType;
 }
 
-export async function getAllUserMessage(sessionId: string): Promise<MessageType[]> {
-    const query = await db.collection(MESSAGES_COLLECTION)
+export async function getAllUserMessage(sessionId: string, lastMessageTimestampInMillis?: number | null): Promise<MessageType[]> {
+    let query = await db.collection(MESSAGES_COLLECTION)
         .where("sessionId", "==", sessionId)
         .where("role", "==", "user")
         .orderBy("timestamp", "asc")
+
+    if (lastMessageTimestampInMillis) {
+        const timeStamp = admin.firestore.Timestamp.fromDate(new Date(lastMessageTimestampInMillis))
+        query = query.where("timestamp", ">", timeStamp);
+    }
 
     const snapshot = await query.get();
     const messages: MessageType[] = [];
@@ -240,7 +246,8 @@ export async function getAllUserMessage(sessionId: string): Promise<MessageType[
             }
         } else {
             const { timestamp, messageId, sessionId, ...content } = data;
-            msg = content as MessageType;
+            data.timestamp = toMillis(data.timestamp);
+            msg = data as MessageType;
         }
 
         const size = estimateMessageSize(msg);

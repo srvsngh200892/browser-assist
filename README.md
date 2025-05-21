@@ -2,6 +2,7 @@
 
 ## Table of Contents
 - [Overview](#browser-assist)
+- [Demo](#demo)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Models and LLM Integration](#models-and-llm-integration)
@@ -33,6 +34,9 @@ Regression Checks: Developers can validate UI behavior across multiple changes b
 Many more ...
 
 With natural language as the interface, this tool makes browser automation accessible to both technical and non-technical users.
+
+## Demo
+![Demo](assets/demo.gif)
 
 ## Features
 

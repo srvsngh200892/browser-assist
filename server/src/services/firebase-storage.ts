@@ -2,6 +2,8 @@ import admin from 'firebase-admin';
 import sharp from 'sharp';
 import phash from 'sharp-phash';
 import { USE_FIREBASE_EMULATOR, FIREBASE_EMULATOR_HOST, FIREBASE_STORAGE_EMULATOR_PORT } from "./env";
+import { getSessionMetadata } from './firebase-sessions';
+
 
 // Initialize Firebase Admin if not already initialized
 console.log(`Initializing Firebase Admin with storage bucket ${process.env.FIREBASE_STORAGE_BUCKET}`);
@@ -247,18 +249,57 @@ async function updateScreenshotCount(sessionId: string): Promise<void> {
 /**
  * Fetches all image buffers from a specific folder path in Firebase Storage.
  * @param sessionId session id
- * @returns Array of Buffers
+ * @returns Object containing image buffers and last file timestamp
  */
- export async function fetchImagesForSession(sessionId: string): Promise<Buffer[]> {
-    const prefix =`validations/${sessionId}/screenshots`
+export async function fetchImagesForSession(sessionId: string): Promise<{ imageBuffers: Buffer[]; lastFileTimestamp: string | undefined }> {
+    const prefix = `validations/${sessionId}/screenshots`;
+    const sessionData = await getSessionMetadata(sessionId);
+    let lastFileTimestamp: string | undefined;
+
+    if (!sessionData) {
+        console.error(`Session not found: ${sessionId}`);
+        return { imageBuffers: [], lastFileTimestamp };
+    }
+
+    const lastScreenshotUsedForValidation = sessionData.lastScreenshotUsedForValidation ? sessionData.lastScreenshotUsedForValidation : undefined;
+
     const [files] = await bucket.getFiles({ prefix });
     const imageFiles = files.filter(file => file.name !== prefix); // Skip folder marker
+
+    let filteredImageFiles = []
+    if (!lastScreenshotUsedForValidation) {
+        filteredImageFiles = imageFiles;
+    } else {
+        const validationTimeMs = new Date(lastScreenshotUsedForValidation).getTime();
+
+        for (const file of imageFiles) {
+            const [metadata] = await file.getMetadata();
+            if (!metadata.timeCreated) continue;
+            const fileTimeMs = new Date(metadata.timeCreated).getTime();
+            console.log("metadata.timeCreated", metadata.timeCreated, fileTimeMs, "vs", validationTimeMs);
+            if (fileTimeMs > validationTimeMs) {
+                filteredImageFiles.push(file);
+            }
+        }
+    }
+
     const imageBuffers = await Promise.all(
-      imageFiles.map(async file => {
-        const [buffer] = await file.download();
-        return buffer;
-      })
+        filteredImageFiles.map(async file => {
+            const [buffer] = await file.download();
+            return buffer;
+        })
     );
 
-    return imageBuffers;
-  }
+    if (filteredImageFiles.length > 0) {
+        const lastFile = filteredImageFiles[filteredImageFiles.length - 1];
+        const [metadata] = await lastFile.getMetadata();
+        if (!metadata.timeCreated) {
+            throw new Error('File metadata missing timeCreated timestamp');
+        }
+        lastFileTimestamp = metadata.timeCreated
+
+    }
+    lastFileTimestamp = lastFileTimestamp ? lastFileTimestamp : lastScreenshotUsedForValidation
+
+    return { imageBuffers, lastFileTimestamp };
+}

@@ -1,18 +1,38 @@
 import { openaiClient } from '../server';
 import { VALIDATOR_MODEL } from './env';
 import { getAllUserMessage } from './firebase-messages';
+import { updateSessionMetadata, getSessionMetadata } from './firebase-sessions';
 import { fetchImagesForSession } from './firebase-storage';
 import { updateValidation } from './firebase-validation';
+import { toMillis } from "../utils/firebase-date-to-milli";
+import * as admin from 'firebase-admin';
 
-async function reviewUserIntentAgent(sessionId: string) {
-  const allUserMessages = await getAllUserMessage(sessionId) || [];
+async function reviewUserIntentAgent(sessionId: string): Promise<{ userSummary: string | null; lastMessageTimestampInMillis: number | undefined }> {
+  //get the timestamp from session and use it as the last message timestamp
+  const session = await getSessionMetadata(sessionId);
+  if (!session) {
+    console.warn(`Session ${sessionId} not found`);
+    return {
+      userSummary: null,
+      lastMessageTimestampInMillis: undefined
+    };
+  }
+  const lastValidation = session.lastMessageUsedForValidation;
+  let lastMessageTimestampInMillis = lastValidation ? lastValidation : undefined;
+  const allUserMessages = await getAllUserMessage(sessionId, lastMessageTimestampInMillis) || [];
   console.log("allUserMessages", allUserMessages)
   if (allUserMessages.length === 0) {
     console.warn("No user messages found for this session. Skipping summary generation.");
-    return;
+    return {
+      userSummary: null,
+      lastMessageTimestampInMillis: lastMessageTimestampInMillis
+    };
   }
 
   const contents = allUserMessages.map(message => message.content as string)
+  const lastMessage = allUserMessages[allUserMessages.length - 1];
+  lastMessageTimestampInMillis = lastMessage.timestamp || undefined;
+
 
   console.log("constnet", contents)
   console.log("VALIDATOR_MODEL", VALIDATOR_MODEL)
@@ -66,9 +86,16 @@ async function reviewUserIntentAgent(sessionId: string) {
     console.log("Summary of User Intent:\n");
 
     console.log(completion.choices[0].message.content);
-    return completion.choices[0].message.content
+    return {
+      userSummary: completion.choices[0].message.content,
+      lastMessageTimestampInMillis
+    }
   } catch (error) {
     console.error("Error generating summary:", error);
+    return {
+      userSummary: null,
+      lastMessageTimestampInMillis: undefined
+    };
   }
 }
 
@@ -93,16 +120,17 @@ const formatContextAsText = (context: Record<string, StepResult>): string => {
 export async function runValidationAgent(sessionId: string): Promise<any> {
   try {
     await updateValidation(sessionId, { agent: 'qa-validator' });
-    const screenshotsBuffers = await fetchImagesForSession(sessionId);
-    console.log("screenshotsBuffers", screenshotsBuffers);
-    const batches = chunk(screenshotsBuffers, 3);
+    const { imageBuffers, lastFileTimestamp } = await fetchImagesForSession(sessionId);
+    const batches = chunk(imageBuffers, 3);
     const results: string[] = [];
     const runningContext: Record<string, StepResult> = {};
-    const userSummary = await reviewUserIntentAgent(sessionId);
-    if (!userSummary) {
+    const { userSummary, lastMessageTimestampInMillis } = await reviewUserIntentAgent(sessionId);
+    if ((!userSummary && lastMessageTimestampInMillis) || (!imageBuffers.length && lastFileTimestamp)) {
+      return {}
+    } else if (!userSummary || !imageBuffers.length) {
       return {
         "steps": [
-          { "step": "Failed to get user steps, Try again", "status": "failed", "explanation": "unable to get from AI" }
+          { "step": "Failed to get user steps or screenshots, Try again", "status": "failed", "explanation": "unable to get from AI" }
         ],
         "finalResult": "Fail"
       };
@@ -121,6 +149,7 @@ export async function runValidationAgent(sessionId: string): Promise<any> {
     const systemPrompt = `
 
 You are a QA validator responsible for evaluating a user's claim of completing a multi-step task using partial screenshots as evidence. Your task is to assess only the steps provided by the user without adding, inventing, modifying, or assuming any additional steps.
+Do not make assumptions about the content beyond UI-level validation. Ignore any sensitive, personal, or ambiguous content. Do not generate or infer any inappropriate or personal information.
 
 # ✅ Evaluation Rules:
 - For each task step, assign one of the following statuses based solely on the visual evidence in the screenshots:
@@ -140,7 +169,8 @@ You are a QA validator responsible for evaluating a user's claim of completing a
   - If a subsequent step is shown in provided screenshots, it indicates the previous step was completed successfully, and you can mark it as passed.
   - Saving or Creating or Updating or Chaning actions does not always trigger a popup or notification. Please check the subsequent screens (e.g., details pages or status labels) to confirm that the changes have been applied.
   - Immediate visual feedback (such as popups or modals) may not always appear after an action. To confirm the outcome, please refer to subsequent screens or indicators (e.g., labels, details pages, or status changes) that reflect the updated state.
-  - Not all actions result in immediate visual confirmations like modals or popups. When assessing success or failure, please also consider subsequent screenshots that may reflect the outcome through updated UI elements such as labels, status indicators, or detail views. Avoid marking a failure solely based on the absence of an instant confirmation.
+  - Not all actions result in immediate visual confirmations like modals or popups. When assessing success or failure, please also consider subsequent screenshots that may reflect the outcome through updated UI elements such as labels, status indicators, tables or detail views. Avoid marking a failure solely based on the absence of an instant confirmation.
+  - If page is not fully loaded please check subsequent screenshots to conclude the result. For example after creation or save table might be not updated immediately, so check for next screenshot to conclude the result.
 - **Do not require the address bar**: 
   - If a known interface or page is shown, assume the navigation was successful. You do not need to see the browser's address bar.
   - ✅ If a known, specific webpage or interface is visible (e.g., sign-in page, landing page, login page, or logo is visible, etc.), you may assume the navigation to the correct URL occurred.
@@ -228,6 +258,13 @@ You are a QA validator responsible for evaluating a user's claim of completing a
     }));
 
     const overallStatus = finalSteps.every(s => s.status === 'passed') ? 'Pass' : 'Fail';
+
+    if (overallStatus === 'Pass') {
+      await updateSessionMetadata(sessionId, {
+        lastMessageUsedForValidation: lastMessageTimestampInMillis ? lastMessageTimestampInMillis : undefined,
+        lastScreenshotUsedForValidation: lastFileTimestamp
+      });
+    }
 
     return {
       steps: finalSteps,

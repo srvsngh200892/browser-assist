@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
-import { getSessionMetadata } from '../services/firebase-sessions';
-import { getValidation, updateValidation, createValidation } from '../services/firebase-validation';
+import { getSessionMetadata, updateSessionMetadata } from '../services/firebase-sessions';
+import { getValidation, updateValidation, createValidation, createOrUpdateValidation } from '../services/firebase-validation';
 import { runValidationAgent } from '../services/validation-agent';
 import { getValidationReportStream, getPdfGenerationStatus, startBackgroundValidationReport } from '../services/pdf-service';
 import axios from 'axios';
@@ -325,24 +325,44 @@ router.post('/validation/download-from-storage', authMiddleware, async (req: any
 
 
 router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) => {
-    const { sessionId } = req.body;
+    const { sessionId, reValidated = false } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
 
     // Verify session exists and belongs to the user
     const sessionData = await getSessionMetadata(sessionId);
+    const validationResult = await getValidation(sessionId);
+    let mergedResult = true
     if (!sessionData) {
         return res.status(404).json({
             success: false,
             error: 'Session not found'
         });
     }
+    if (reValidated || !validationResult || (validationResult.result?.[0]?.finalResult !== 'Pass')) {
+        mergedResult = false
+        await createValidation(sessionId)
+        await updateSessionMetadata(sessionId, {
+            lastMessageUsedForValidation: null,
+            lastScreenshotUsedForValidation: null
+        })
+    } else {
+        await updateValidation(sessionId, { status: 'pending' })
+    }
 
-    await createValidation(sessionId);
-    const validationResult = await getValidation(sessionId);
     (async () => {
         try {
-            const result = await runValidationAgent(sessionId);
-            await updateValidation(sessionId, { status: 'completed', result, progress: 100 });
+            const newResult = await runValidationAgent(sessionId);
+            if (mergedResult && validationResult && validationResult.result) {
+                let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
+                index = index === -1 ? validationResult.result.length : index;
+                if (Object.keys(newResult).length > 0) {
+                    await updateValidation(sessionId, { status: 'completed', result: [...validationResult.result.slice(0, index), newResult], progress: 100 });
+                } else {
+                    await updateValidation(sessionId, { status: 'completed', progress: 100 });
+                }
+            } else {
+                await updateValidation(sessionId, { status: 'completed', result: [newResult], progress: 100 });
+            }
         } catch (err) {
             console.error('Validation error:', err);
             await updateValidation(sessionId, {
@@ -356,7 +376,7 @@ router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) 
         success: true,
         status: "processing",
         message: "Validation started.",
-        agent: validationResult?.agent || 'test-planner'
+        agent: 'test-planner'
     });
 });
 
@@ -371,8 +391,15 @@ router.get('/validate-via-ai/:sessionId', authMiddleware, async (req: any, res: 
     }
     const doc = await getValidation(sessionId);
     if (!doc) return res.status(404).json({ error: 'Validation not found' });
-
-    res.json(doc);
+    //get all the results and merge steps and get final result from last result
+    const mergedSteps = doc.result?.flatMap(result => result.steps) || [];
+    const finalResult = doc.result?.[doc.result.length - 1]?.finalResult;
+    const mergedResult = {
+        steps: mergedSteps,
+        finalResult
+    }
+    // return doc but with mergedResult instead of ResultSchema
+    res.json({ ...doc, result: mergedResult });
 });
 
 export default router; 
