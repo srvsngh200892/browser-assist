@@ -333,13 +333,19 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
         try {
             const validationData = await getValidation(sessionId);
             if (validationData?.result) {
-                const finalResult = validationData.result.finalResult === 'Pass' ? 'PASSED' : 'FAILED';
+                const mergedSteps = validationData.result?.flatMap((result: any) => result.steps) || [];
+                const finalStatus = validationData.result?.[validationData.result.length - 1]?.finalResult;
+                const result = {
+                    steps: mergedSteps,
+                    finalResult: finalStatus
+                }
+                const finalResult = result.finalResult === 'Pass' ? 'PASSED' : 'FAILED';
                 doc.addPage();
 
                 // Green header background with checkmark - reduced height
                 const headerHeight = 45;
                 doc.save()
-                    .fillColor(validationData.result.finalResult === 'Pass' ? '#48bb78' : '#e53e3e')
+                    .fillColor(result.finalResult === 'Pass' ? '#48bb78' : '#e53e3e')
                     .roundedRect(50, 50, doc.page.width - 100, headerHeight, 10)
                     .fill();
 
@@ -360,7 +366,7 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
                 const startY = 50 + headerHeight + 20;
                 let currentY = startY;
 
-                validationData.result.steps.forEach((step: { step: string; status: string; explanation: string }, index: number) => {
+                result.steps.forEach((step: { step: string; status: string; explanation: string }, index: number) => {
                     // Calculate text heights
                     const stepTextHeight = doc.heightOfString(step.step, {
                         width: doc.page.width - 200,

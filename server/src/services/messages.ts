@@ -26,6 +26,7 @@ export type MessageType = (
     }
 ) & {
     tool_calls?: Array<any>;
+    timestamp?: number;
 };
 
 class MessageHandler {
@@ -78,7 +79,7 @@ class MessageHandler {
     public async updateFromStorage(): Promise<void> {
         const messages = await getSessionMessages(this.sessionId);
         console.log(`fetching messages ${messages.length} from sever for session id ${this.sessionId}`)
-        if (messages && messages.length > 1 ) {
+        if (messages && messages.length > 1) {
             this.messages = messages
         }
     }

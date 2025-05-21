@@ -24,6 +24,8 @@ export interface SessionMetadata {
     status: 'active' | 'inactive' | 'expired';
     messageProcessing: boolean,
     lastMessageRetrieval: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
+    lastScreenshotUsedForValidation?: string | null;
+    lastMessageUsedForValidation?: number | null;
     metadata?: Record<string, any>;
 }
 
@@ -131,7 +133,7 @@ export async function setSessionStatus(sessionId: string, status: 'active' | 'in
     return updateSessionMetadata(sessionId, { status });
 }
 
-export async function  updatelastMessageRetrieval(sessionId: string): Promise<boolean> {
+export async function updatelastMessageRetrieval(sessionId: string): Promise<boolean> {
     return updateSessionMetadata(sessionId, { lastMessageRetrieval: FieldValue.serverTimestamp() });
 }
 
@@ -281,7 +283,7 @@ export async function createMessageHandler(sessionId: string): Promise<MessageHa
     return messageHandler;
 }
 
-export async function getMessageHandler(sessionId: string, fromSever=true): Promise<MessageHandler> {
+export async function getMessageHandler(sessionId: string, fromSever = true): Promise<MessageHandler> {
     console.log(`Getting message handler for session: ${sessionId}`);
     let messageHandler = sessionStore.getMessageHandler(sessionId);
     if (messageHandler) {
