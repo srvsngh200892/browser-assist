@@ -16,7 +16,7 @@ const VALIDATIONS_VIA_AI_COLLECTION = "validations-via-ai";
 type StepResult = {
     id: number;
     step: string;
-    status: 'passed' | 'filed' | 'invisible';
+    status: 'passed' | 'failed' | 'invisible';
     explanation: string;
 };
 

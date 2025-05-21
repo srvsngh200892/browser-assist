@@ -326,6 +326,9 @@ router.post('/validation/download-from-storage', authMiddleware, async (req: any
 
 router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) => {
     const { sessionId, reValidated = false } = req.body;
+    let partialRetry = false
+    let stepToRetry: string[] = []
+    let failedStepsWithIndex: { step: string, index: number }[] = []
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
 
     // Verify session exists and belongs to the user
@@ -338,7 +341,25 @@ router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) 
             error: 'Session not found'
         });
     }
-    if (reValidated || !validationResult || (validationResult.result?.[0]?.finalResult !== 'Pass')) {
+    if (validationResult?.result) {
+        let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
+        //get the steps from failed batch index where step is failed    just get key of the object of failed step steps is an object
+        if (index !== -1) {
+            const totalSteps = validationResult.result[index].steps.length;
+
+            failedStepsWithIndex = validationResult.result[index].steps
+                .map((step, idx) => ['failed', 'invisible'].includes(step.status) ? { step: step.step, index: idx } : null)
+                .filter(step => step !== null);
+            stepToRetry.push(...failedStepsWithIndex.map(step => step.step));
+            const failedSteps = stepToRetry.length;
+            console.log('stepToRetry', stepToRetry)
+            const percentage = (failedSteps / totalSteps) * 100;
+            if (percentage <= 50) {
+                partialRetry = true
+            }
+        }
+    }
+    if (reValidated || !validationResult) {
         mergedResult = false
         await createValidation(sessionId)
         await updateSessionMetadata(sessionId, {
@@ -351,11 +372,26 @@ router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) 
 
     (async () => {
         try {
-            const newResult = await runValidationAgent(sessionId);
+            let newResult = await runValidationAgent(sessionId, stepToRetry, partialRetry);
+            console.log("result", JSON.stringify(newResult, null, 2))
             if (mergedResult && validationResult && validationResult.result) {
                 let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
                 index = index === -1 ? validationResult.result.length : index;
                 if (Object.keys(newResult).length > 0) {
+                    if (partialRetry) {
+                        const failedBatch = validationResult.result[index].steps
+                        const steps = failedBatch.map((step, index) => {
+                            if (step.status === 'failed' || step.status === 'invisible') {
+                                step.status = newResult.steps[0].status
+                                step.step = newResult.steps[0].step
+                                newResult.steps.shift()
+                            }
+                            return step
+                        })
+                        const stepsToAdd = steps.filter(step => !newResult.steps.includes(step))
+                        newResult.steps = [...stepsToAdd, ...newResult.steps]
+                        console.log("after modify result", JSON.stringify(newResult, null, 2))
+                    }
                     await updateValidation(sessionId, { status: 'completed', result: [...validationResult.result.slice(0, index), newResult], progress: 100 });
                 } else {
                     await updateValidation(sessionId, { status: 'completed', progress: 100 });

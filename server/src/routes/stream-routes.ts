@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
 import { getSessionMetadata } from '../services/firebase-sessions';
-import { getMcpClient } from '../utils/client';
+import { getMcpClient } from '../utils/playwright-mcp-client';
 import {
     getStreamState,
     setStreamState,
