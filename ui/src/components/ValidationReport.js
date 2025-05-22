@@ -189,6 +189,7 @@ const ValidationReport = ({
 
             if (error) {
                 setAiValidationError(error);
+                setAiValidationResult(result);
                 clearInterval(aiPollInterval);
                 setAiPollInterval(null);
                 setAiValidating(false);
@@ -196,6 +197,7 @@ const ValidationReport = ({
             }
 
             if (status === 'completed') {
+                setAiValidationError(null);
                 setAiValidationResult(result);
                 clearInterval(aiPollInterval);
                 setAiPollInterval(null);

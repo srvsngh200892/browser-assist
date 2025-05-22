@@ -27,7 +27,7 @@ export const useHandleSendMessage = (sessionId, setLoading, setMessages, setStre
     const SESSION_MAX_RETRIES = 5; // Maximum number of retries in a short period
     const SESSION_REQUEST_DEBOUNCE_KEY = 'session-request-debounce'; // Key for tracking recent requests
     const SESSION_REQUEST_DEBOUNCE_TIME = 3000; // 3 seconds debounce time
-    const LOCAL_POLL_INTERVAL = 10000; // Using a local variable to avoid naming conflict
+    const LOCAL_POLL_INTERVAL = 1500; // Using a local variable to avoid naming conflict
 
     const handleNewAssistantMessages = useCallback((newMessages) => {
         console.log('TYPING: Found new assistant messages for typing animation:', newMessages.length);
