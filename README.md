@@ -201,27 +201,4 @@ Coming soon
 - `POST /api/validate-via-ai`: Start AI-powered validation for a session
 - `GET /api/validate-via-ai/:sessionId`: Get validation status and results
 
-## Troubleshooting
-
-### Common Issues
-1. **Docker Setup Issues**
-   - Ensure all required ports are available
-   - Check Docker memory allocation
-   - Verify network configurations
-
-2. **Browser Automation Problems**
-   - Check MCP container is running
-   - Verify dependencies
-   - Review network connectivity
-
-3. **Model Integration Issues**
-   - Validate API keys and permissions
-   - Check model availability
-   - Review rate limits and quotas
-
-### Debugging Tools
-- Built-in logging system
-- Performance monitoring
-- Error tracking integration
-- Debug mode instructions
 
