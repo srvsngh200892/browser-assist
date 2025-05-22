@@ -16,7 +16,7 @@ import {
 import { authMiddleware } from '../middleware/auth-middleware';
 import sessionStore from '../services/session-store';
 import { MCP_SERVER_BASE_URL } from '../config/env';
-import { removeMcpClient } from '../utils/client';
+import { removeMcpClient } from '../utils/playwright-mcp-client';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret-key-change-in-production";
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "your-jwt-refresh-secret-key-change-in-production";
@@ -83,7 +83,7 @@ router.post("/auth/login", async (req: Request, res: Response) => {
             httpOnly: true, // Prevents access via JavaScript
             secure: true, // Use HTTPS in production
             sameSite: 'strict', // Prevents cross-site request forgery
-            maxAge: 86400000 ,// 1 hour,
+            maxAge: 86400000,// 1 hour,
             path: '/api/refresh',
         });
 
@@ -181,7 +181,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
             httpOnly: true, // Prevents access via JavaScript
             secure: true, // Use HTTPS in production
             sameSite: 'strict', // Prevents cross-site request forgery
-            maxAge: 86400000 ,// 1 hour,
+            maxAge: 86400000,// 1 hour,
             path: '/api/refresh',
         });
 
@@ -279,7 +279,7 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
 
         try {
             await axios.delete(`${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`);
-        } catch(error) {
+        } catch (error) {
             console.error(`error deleting persistent data for ${sessionId} ${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`, error)
         }
         await deleteMcpSession(sessionId)
@@ -308,22 +308,22 @@ router.post('/refresh', async (req: any, res: Response) => {
     const refreshToken = req.cookies?.refresh_token;
 
     if (!refreshToken) {
-      return res.status(401).json({ success: false, error: 'No refresh token' });
+        return res.status(401).json({ success: false, error: 'No refresh token' });
     }
 
     try {
-      const decoded = await verifyToken(refreshToken, JWT_REFRESH_SECRET);;
-      const user = await getUserById(decoded.userId);
+        const decoded = await verifyToken(refreshToken, JWT_REFRESH_SECRET);;
+        const user = await getUserById(decoded.userId);
 
-      if (!user) {
-        return res.status(401).json({ success: false, error: 'User not found' });
-      }
-      // Generate JWT token using the utility function
-      const token = await createToken({
-        userId: user.userId,
-        email: user.email,
-        username: user.username
-       }, JWT_SECRET);
+        if (!user) {
+            return res.status(401).json({ success: false, error: 'User not found' });
+        }
+        // Generate JWT token using the utility function
+        const token = await createToken({
+            userId: user.userId,
+            email: user.email,
+            username: user.username
+        }, JWT_SECRET);
 
         // Generate JWT token using the utility function
         const newRefreshToken = await createToken({
@@ -332,24 +332,24 @@ router.post('/refresh', async (req: any, res: Response) => {
             username: user.username
         }, JWT_REFRESH_SECRET);
 
-       res.cookie('token', token, {
-        httpOnly: true, // Prevents access via JavaScript
-        secure: true, // Use HTTPS in production
-        sameSite: 'strict', // Prevents cross-site request forgery
-        maxAge: 7200 * 1000
-      });
+        res.cookie('token', token, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 7200 * 1000
+        });
 
-      res.cookie('refresh_token', newRefreshToken, {
-        httpOnly: true, // Prevents access via JavaScript
-        secure: true, // Use HTTPS in production
-        sameSite: 'strict', // Prevents cross-site request forgery
-        maxAge: 86400000 ,// 1 hour,
-        path: '/api/refresh',
-    });
+        res.cookie('refresh_token', newRefreshToken, {
+            httpOnly: true, // Prevents access via JavaScript
+            secure: true, // Use HTTPS in production
+            sameSite: 'strict', // Prevents cross-site request forgery
+            maxAge: 86400000,// 1 hour,
+            path: '/api/refresh',
+        });
 
-      return res.json({ success: true });
+        return res.json({ success: true });
     } catch (err) {
-      return res.status(403).json({ success: false, error: 'Invalid refresh token' });
+        return res.status(403).json({ success: false, error: 'Invalid refresh token' });
     }
 });
 

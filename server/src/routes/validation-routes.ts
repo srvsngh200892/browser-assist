@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
-import { getSessionMetadata, updateSessionMetadata } from '../services/firebase-sessions';
-import { getValidation, updateValidation, createValidation, createOrUpdateValidation } from '../services/firebase-validation';
-import { runValidationAgent } from '../services/validation-agent';
+import { getSessionMetadata } from '../services/firebase-sessions';
+import { getValidation } from '../services/firebase-validation';
 import { getValidationReportStream, getPdfGenerationStatus, startBackgroundValidationReport } from '../services/pdf-service';
 import axios from 'axios';
+import { startValidationViaAI } from '../services/validation';
 
 // Initialize router
 const router = express.Router();
@@ -323,61 +323,17 @@ router.post('/validation/download-from-storage', authMiddleware, async (req: any
     }
 });
 
-
 router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) => {
     const { sessionId, reValidated = false } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
 
-    // Verify session exists and belongs to the user
-    const sessionData = await getSessionMetadata(sessionId);
-    const validationResult = await getValidation(sessionId);
-    let mergedResult = true
-    if (!sessionData) {
-        return res.status(404).json({
-            success: false,
-            error: 'Session not found'
-        });
-    }
-    if (reValidated || !validationResult || (validationResult.result?.[0]?.finalResult !== 'Pass')) {
-        mergedResult = false
-        await createValidation(sessionId)
-        await updateSessionMetadata(sessionId, {
-            lastMessageUsedForValidation: null,
-            lastScreenshotUsedForValidation: null
-        })
-    } else {
-        await updateValidation(sessionId, { status: 'pending' })
+    const result = await startValidationViaAI(sessionId, reValidated);
+
+    if (result?.error) {
+        return res.status(result.code || 500).json({ success: false, error: result.error });
     }
 
-    (async () => {
-        try {
-            const newResult = await runValidationAgent(sessionId);
-            if (mergedResult && validationResult && validationResult.result) {
-                let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
-                index = index === -1 ? validationResult.result.length : index;
-                if (Object.keys(newResult).length > 0) {
-                    await updateValidation(sessionId, { status: 'completed', result: [...validationResult.result.slice(0, index), newResult], progress: 100 });
-                } else {
-                    await updateValidation(sessionId, { status: 'completed', progress: 100 });
-                }
-            } else {
-                await updateValidation(sessionId, { status: 'completed', result: [newResult], progress: 100 });
-            }
-        } catch (err) {
-            console.error('Validation error:', err);
-            await updateValidation(sessionId, {
-                status: 'error',
-                progress: 100,
-                error: err instanceof Error ? err.message : 'Unknown error',
-            });
-        }
-    })();
-    res.json({
-        success: true,
-        status: "processing",
-        message: "Validation started.",
-        agent: 'test-planner'
-    });
+    res.json(result);
 });
 
 router.get('/validate-via-ai/:sessionId', authMiddleware, async (req: any, res: Response) => {

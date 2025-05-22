@@ -1,6 +1,6 @@
 import { MessageHandler, MessageType } from './messages';
 import { openaiClient } from '../server';
-import { getMcpClient } from '../utils/client';
+import { getMcpClient } from '../utils/playwright-mcp-client';
 import {
     applyToolCallsIfPresent,
     isDone,
@@ -108,7 +108,7 @@ export // Function to process responses asynchronously
                 await messageHandler.addMessage(assistantMessage);
 
                 if (isDone(response)) {
-                    console.log(`Agent loop is Done for session ${sessionId}, ${JSON.stringify(response,null,2)}`);
+                    console.log(`Agent loop is Done for session ${sessionId}, ${JSON.stringify(response, null, 2)}`);
                     break;
                 }
 

@@ -6,10 +6,10 @@ import { fetchImagesForSession } from './firebase-storage';
 import { updateValidation } from './firebase-validation';
 import { toMillis } from "../utils/firebase-date-to-milli";
 import * as admin from 'firebase-admin';
+import { MessageType } from './messages';
 
-async function reviewUserIntentAgent(sessionId: string): Promise<{ userSummary: string | null; lastMessageTimestampInMillis: number | undefined }> {
+async function reviewUserIntentAgent(sessionId: string, stepToRetry: string[], partialRetry: boolean, session: any): Promise<{ userSummary: string | null; lastMessageTimestampInMillis: number | undefined }> {
   //get the timestamp from session and use it as the last message timestamp
-  const session = await getSessionMetadata(sessionId);
   if (!session) {
     console.warn(`Session ${sessionId} not found`);
     return {
@@ -19,7 +19,12 @@ async function reviewUserIntentAgent(sessionId: string): Promise<{ userSummary: 
   }
   const lastValidation = session.lastMessageUsedForValidation;
   let lastMessageTimestampInMillis = lastValidation ? lastValidation : undefined;
-  const allUserMessages = await getAllUserMessage(sessionId, lastMessageTimestampInMillis) || [];
+  let allUserMessages = await getAllUserMessage(sessionId, lastMessageTimestampInMillis) || [];
+  if (partialRetry) {
+    // add stepToRetry to allUserMessages object
+    allUserMessages = [...stepToRetry.map((step, index) => ({ role: "user", content: step } as MessageType)), ...allUserMessages]
+    console.log("allUserMessages in retry", allUserMessages)
+  }
   console.log("allUserMessages", allUserMessages)
   if (allUserMessages.length === 0) {
     console.warn("No user messages found for this session. Skipping summary generation.");
@@ -117,14 +122,15 @@ const formatContextAsText = (context: Record<string, StepResult>): string => {
     .join('\n');
 };
 
-export async function runValidationAgent(sessionId: string): Promise<any> {
+export async function runValidationAgent(sessionId: string, stepToRetry: string[], partialRetry: boolean): Promise<any> {
   try {
     await updateValidation(sessionId, { agent: 'qa-validator' });
+    const session = await getSessionMetadata(sessionId);
     const { imageBuffers, lastFileTimestamp } = await fetchImagesForSession(sessionId);
     const batches = chunk(imageBuffers, 3);
     const results: string[] = [];
     const runningContext: Record<string, StepResult> = {};
-    const { userSummary, lastMessageTimestampInMillis } = await reviewUserIntentAgent(sessionId);
+    let { userSummary, lastMessageTimestampInMillis } = await reviewUserIntentAgent(sessionId, stepToRetry, partialRetry, session);
     if ((!userSummary && lastMessageTimestampInMillis) || (!imageBuffers.length && lastFileTimestamp)) {
       return {}
     } else if (!userSummary || !imageBuffers.length) {
@@ -261,14 +267,22 @@ Do not make assumptions about the content beyond UI-level validation. Ignore any
 
     if (overallStatus === 'Pass') {
       await updateSessionMetadata(sessionId, {
-        lastMessageUsedForValidation: lastMessageTimestampInMillis ? lastMessageTimestampInMillis : undefined,
+        lastMessageUsedForValidation: lastMessageTimestampInMillis ? lastMessageTimestampInMillis : session?.lastMessageUsedForValidation,
         lastScreenshotUsedForValidation: lastFileTimestamp
+      });
+    } else {
+      await updateSessionMetadata(sessionId, {
+        lastMessageUsedForValidation: lastMessageTimestampInMillis ? lastMessageTimestampInMillis : session?.lastMessageUsedForValidation,
+        lastScreenshotUsedForValidation: null
       });
     }
 
     return {
-      steps: finalSteps,
-      finalResult: overallStatus
+      result: {
+        steps: finalSteps,
+        finalResult: overallStatus
+      },
+      lastScreenshotUsedForValidation: lastFileTimestamp
     };
 
 

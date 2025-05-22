@@ -464,7 +464,8 @@ const ValidationReport = ({
                                                         <span className="step-title">{step.step}</span>
                                                         <span className="step-status">
                                                             {step.status === 'passed' ? '✓' :
-                                                                step.status === 'failed' ? '×' : '?'}
+                                                                step.status === 'failed' ? '×' :
+                                                                    step.status === 'ignored' ? '⏭' : '?'}
                                                         </span>
                                                     </div>
                                                     <div className="step-explanation">
