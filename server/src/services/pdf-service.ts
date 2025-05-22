@@ -396,7 +396,7 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
 
                     // Left border color based on status
                     doc.save()
-                        .fillColor(step.status === 'passed' ? '#48bb78' : step.status === 'failed' ? '#e53e3e' : '#e53e3e')
+                        .fillColor(step.status === 'passed' ? '#48bb78' : step.status === 'ignored' ? '#a0aec0' : '#e53e3e')
                         .rect(50, currentY, 4, stepHeight)
                         .fill();
 
@@ -420,9 +420,10 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
 
                     // Status text with appropriate color - adjusted position
                     const statusText = step.status === 'passed' ? 'PASSED' :
-                        step.status === 'failed' ? 'FAILED' : 'FAILED';
+                        step.status === 'ignored' ? 'IGNORED' : 'FAILED';
                     const statusColor = step.status === 'passed' ? '#48bb78' :
-                        step.status === 'failed' ? '#e53e3e' : '#e53e3e';
+                        step.status === 'failed' ? '#e53e3e' :
+                            step.status === 'ignored' ? '#a0aec0' : '#e53e3e';
                     doc.font('Helvetica-Bold')
                         .fillColor(statusColor)
                         .fontSize(12)

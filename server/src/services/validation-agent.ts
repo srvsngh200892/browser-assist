@@ -278,8 +278,11 @@ Do not make assumptions about the content beyond UI-level validation. Ignore any
     }
 
     return {
-      steps: finalSteps,
-      finalResult: overallStatus
+      result: {
+        steps: finalSteps,
+        finalResult: overallStatus
+      },
+      lastScreenshotUsedForValidation: lastFileTimestamp
     };
 
 

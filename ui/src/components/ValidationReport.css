@@ -641,6 +641,21 @@
     border-left: 4px solid #718096;
 }
 
+.validation-step.ignored {
+    border-left: 4px solid #9CA3AF;
+    opacity: 0.7;
+}
+
+.validation-step.ignored .step-title {
+    text-decoration: line-through;
+    color: #6B7280;
+}
+
+.validation-step.ignored .step-status {
+    color: #9CA3AF;
+    background: rgba(156, 163, 175, 0.1);
+}
+
 .step-header {
     display: flex;
     align-items: center;

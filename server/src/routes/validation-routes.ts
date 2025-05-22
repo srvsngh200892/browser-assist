@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth-middleware';
-import { getSessionMetadata, updateSessionMetadata } from '../services/firebase-sessions';
-import { getValidation, updateValidation, createValidation, createOrUpdateValidation } from '../services/firebase-validation';
-import { runValidationAgent } from '../services/validation-agent';
+import { getSessionMetadata } from '../services/firebase-sessions';
+import { getValidation } from '../services/firebase-validation';
 import { getValidationReportStream, getPdfGenerationStatus, startBackgroundValidationReport } from '../services/pdf-service';
 import axios from 'axios';
+import { startValidationViaAI } from '../services/validation';
 
 // Initialize router
 const router = express.Router();
@@ -323,97 +323,17 @@ router.post('/validation/download-from-storage', authMiddleware, async (req: any
     }
 });
 
-
 router.post('/validate-via-ai', authMiddleware, async (req: any, res: Response) => {
     const { sessionId, reValidated = false } = req.body;
-    let partialRetry = false
-    let stepToRetry: string[] = []
-    let failedStepsWithIndex: { step: string, index: number }[] = []
     if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
 
-    // Verify session exists and belongs to the user
-    const sessionData = await getSessionMetadata(sessionId);
-    const validationResult = await getValidation(sessionId);
-    let mergedResult = true
-    if (!sessionData) {
-        return res.status(404).json({
-            success: false,
-            error: 'Session not found'
-        });
-    }
-    if (validationResult?.result) {
-        let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
-        //get the steps from failed batch index where step is failed    just get key of the object of failed step steps is an object
-        if (index !== -1) {
-            const totalSteps = validationResult.result[index].steps.length;
+    const result = await startValidationViaAI(sessionId, reValidated);
 
-            failedStepsWithIndex = validationResult.result[index].steps
-                .map((step, idx) => ['failed', 'invisible'].includes(step.status) ? { step: step.step, index: idx } : null)
-                .filter(step => step !== null);
-            stepToRetry.push(...failedStepsWithIndex.map(step => step.step));
-            const failedSteps = stepToRetry.length;
-            console.log('stepToRetry', stepToRetry)
-            const percentage = (failedSteps / totalSteps) * 100;
-            if (percentage <= 50) {
-                partialRetry = true
-            }
-        }
-    }
-    if (reValidated || !validationResult) {
-        mergedResult = false
-        await createValidation(sessionId)
-        await updateSessionMetadata(sessionId, {
-            lastMessageUsedForValidation: null,
-            lastScreenshotUsedForValidation: null
-        })
-    } else {
-        await updateValidation(sessionId, { status: 'pending' })
+    if (result?.error) {
+        return res.status(result.code || 500).json({ success: false, error: result.error });
     }
 
-    (async () => {
-        try {
-            let newResult = await runValidationAgent(sessionId, stepToRetry, partialRetry);
-            console.log("result", JSON.stringify(newResult, null, 2))
-            if (mergedResult && validationResult && validationResult.result) {
-                let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
-                index = index === -1 ? validationResult.result.length : index;
-                if (Object.keys(newResult).length > 0) {
-                    if (partialRetry) {
-                        const failedBatch = validationResult.result[index].steps
-                        const steps = failedBatch.map((step, index) => {
-                            if (step.status === 'failed' || step.status === 'invisible') {
-                                step.status = newResult.steps[0].status
-                                step.step = newResult.steps[0].step
-                                newResult.steps.shift()
-                            }
-                            return step
-                        })
-                        const stepsToAdd = steps.filter(step => !newResult.steps.includes(step))
-                        newResult.steps = [...stepsToAdd, ...newResult.steps]
-                        console.log("after modify result", JSON.stringify(newResult, null, 2))
-                    }
-                    await updateValidation(sessionId, { status: 'completed', result: [...validationResult.result.slice(0, index), newResult], progress: 100 });
-                } else {
-                    await updateValidation(sessionId, { status: 'completed', progress: 100 });
-                }
-            } else {
-                await updateValidation(sessionId, { status: 'completed', result: [newResult], progress: 100 });
-            }
-        } catch (err) {
-            console.error('Validation error:', err);
-            await updateValidation(sessionId, {
-                status: 'error',
-                progress: 100,
-                error: err instanceof Error ? err.message : 'Unknown error',
-            });
-        }
-    })();
-    res.json({
-        success: true,
-        status: "processing",
-        message: "Validation started.",
-        agent: 'test-planner'
-    });
+    res.json(result);
 });
 
 router.get('/validate-via-ai/:sessionId', authMiddleware, async (req: any, res: Response) => {

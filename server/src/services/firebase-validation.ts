@@ -13,11 +13,12 @@ const db = getFirestore();
 
 const VALIDATIONS_VIA_AI_COLLECTION = "validations-via-ai";
 
-type StepResult = {
+export type StepResult = {
     id: number;
     step: string;
-    status: 'passed' | 'failed' | 'invisible';
+    status: 'passed' | 'failed' | 'invisible' | 'ignored';
     explanation: string;
+    count: number;
 };
 
 type ValidationResult = {
