@@ -23,9 +23,7 @@ async function reviewUserIntentAgent(sessionId: string, stepToRetry: string[], p
   if (partialRetry) {
     // add stepToRetry to allUserMessages object
     allUserMessages = [...stepToRetry.map((step, index) => ({ role: "user", content: step } as MessageType)), ...allUserMessages]
-    console.log("allUserMessages in retry", allUserMessages)
   }
-  console.log("allUserMessages", allUserMessages)
   if (allUserMessages.length === 0) {
     console.warn("No user messages found for this session. Skipping summary generation.");
     return {
@@ -38,9 +36,6 @@ async function reviewUserIntentAgent(sessionId: string, stepToRetry: string[], p
   const lastMessage = allUserMessages[allUserMessages.length - 1];
   lastMessageTimestampInMillis = lastMessage.timestamp || undefined;
 
-
-  console.log("constnet", contents)
-  console.log("VALIDATOR_MODEL", VALIDATOR_MODEL)
 
   const formattedSteps = contents
     .map((msg: string, index: number) => `${index + 1}. ${msg.trim()}`)
@@ -127,19 +122,15 @@ export async function runValidationAgent(sessionId: string, stepToRetry: string[
     await updateValidation(sessionId, { agent: 'qa-validator' });
     const session = await getSessionMetadata(sessionId);
     const { imageBuffers, lastFileTimestamp } = await fetchImagesForSession(sessionId);
+    console.log("total images to be processes", imageBuffers.length)
     const batches = chunk(imageBuffers, 3);
     const results: string[] = [];
     const runningContext: Record<string, StepResult> = {};
     let { userSummary, lastMessageTimestampInMillis } = await reviewUserIntentAgent(sessionId, stepToRetry, partialRetry, session);
     if ((!userSummary && lastMessageTimestampInMillis) || (!imageBuffers.length && lastFileTimestamp)) {
-      return {}
+      return { error: "Failed to get user steps or screenshots, Try again" };
     } else if (!userSummary || !imageBuffers.length) {
-      return {
-        "steps": [
-          { "step": "Failed to get user steps or screenshots, Try again", "status": "failed", "explanation": "unable to get from AI" }
-        ],
-        "finalResult": "Fail"
-      };
+      return { error: "Failed to get user steps or screenshots, Try again" };
     }
 
     // Calculate total steps for progress tracking
@@ -255,8 +246,6 @@ Do not make assumptions about the content beyond UI-level validation. Ignore any
       });
     }
 
-    console.log("finalresults", JSON.stringify(runningContext, null, 2));
-
     const finalSteps = Object.entries(runningContext).map(([step, { status, reason }]) => ({
       step,
       status,
@@ -362,13 +351,7 @@ Do not make assumptions about the content beyond UI-level validation. Ignore any
     //     throw err;
     //   }
   } catch (error) {
-    console.error("Error during screenshot validation:", error);
-    return {
-      "steps": [
-        { "step": "Failed to validate screenshots, Try again", "status": "failed", "explanation": "An error occurred during processing" }
-      ],
-      "finalResult": "Fail"
-    };
+    return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 
 }

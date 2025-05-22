@@ -276,7 +276,6 @@ export async function fetchImagesForSession(sessionId: string): Promise<{ imageB
             const [metadata] = await file.getMetadata();
             if (!metadata.timeCreated) continue;
             const fileTimeMs = new Date(metadata.timeCreated).getTime();
-            console.log("metadata.timeCreated", metadata.timeCreated, fileTimeMs, "vs", validationTimeMs);
             if (fileTimeMs > validationTimeMs) {
                 filteredImageFiles.push(file);
             }

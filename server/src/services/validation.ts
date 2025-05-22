@@ -45,7 +45,14 @@ export async function startValidationViaAI(sessionId: string, reValidated: boole
 
     (async () => {
         try {
-            const { result, lastScreenshotUsedForValidation } = await runValidationAgent(sessionId, stepToRetry, partialRetry);
+            const { result, lastScreenshotUsedForValidation, error } = await runValidationAgent(sessionId, stepToRetry, partialRetry);
+            if (error) {
+                return await updateValidation(sessionId, {
+                    status: 'error',
+                    error: error,
+                    progress: 100
+                });
+            }
             if (mergedResult && validationResult?.result) {
                 let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
                 index = index === -1 ? validationResult.result.length : index;
