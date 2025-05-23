@@ -35,7 +35,7 @@ export const useScreenshotAvailability = (sessionId) => {
       // Set up interval to periodically check for screenshots
       const screenshotCheckInterval = setInterval(() => {
         checkScreenshotAvailability();
-      }, 30000); // Check every 30 seconds
+      }, 10000); // Check every 10 seconds
 
       return () => clearInterval(screenshotCheckInterval);
     }

@@ -119,7 +119,7 @@ describe('useScreenshotAvailability', () => {
 
         // Advance time and trigger interval
         await act(async () => {
-            jest.advanceTimersByTime(30000);
+            jest.advanceTimersByTime(10000);
             await Promise.resolve();
         });
 
@@ -141,7 +141,7 @@ describe('useScreenshotAvailability', () => {
 
         // Advance time to verify interval is cleared
         await act(async () => {
-            jest.advanceTimersByTime(30000);
+            jest.advanceTimersByTime(10000);
             await Promise.resolve();
         });
 
@@ -179,7 +179,7 @@ describe('useScreenshotAvailability', () => {
 
         // Advance time and trigger interval
         await act(async () => {
-            jest.advanceTimersByTime(30000);
+            jest.advanceTimersByTime(10000);
             await Promise.resolve();
         });
 
