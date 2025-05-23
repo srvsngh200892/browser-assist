@@ -83,9 +83,6 @@ async function reviewUserIntentAgent(sessionId: string, stepToRetry: string[], p
       temperature: 0.5
     });
 
-    console.log("Summary of User Intent:\n");
-
-    console.log(completion.choices[0].message.content);
     return {
       userSummary: completion.choices[0].message.content,
       lastMessageTimestampInMillis
@@ -225,7 +222,6 @@ Do not make assumptions about the content beyond UI-level validation. Ignore any
       try {
         parsedBatchResult = JSON.parse(batchResult);
       } catch (err) {
-        console.log("batchResult", batchResult)
         const cleanContent = batchResult.replace(/```json\n ?|\n ? ```/g, '').trim();
         parsedBatchResult = JSON.parse(cleanContent);
       }
