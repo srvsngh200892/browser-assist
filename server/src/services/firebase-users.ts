@@ -4,6 +4,9 @@ import { v4 as uuidv4 } from "uuid";
 import { Timestamp } from "firebase-admin/firestore";
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { FIREBASE_PROJECT_ID } from "../config/env";
+import admin from '../config/firebase';
+import { getAuth } from 'firebase-admin/auth';
+
 // Initialize Firebase Admin if not already initialized
 if (!getFirestore.length) {
     initializeApp({
@@ -12,8 +15,8 @@ if (!getFirestore.length) {
     });
 }
 
-
-const db = getFirestore();
+const db = admin.firestore();
+const auth = getAuth();
 
 const USERS_COLLECTION = "users";
 
@@ -101,4 +104,8 @@ export async function getUserById(userId: string) {
         console.error("Error fetching user by ID:", error);
         return null;
     }
+}
+
+export const findOrCreateUser = async (decodedToken: any) => {
+    // ... existing code ...
 }

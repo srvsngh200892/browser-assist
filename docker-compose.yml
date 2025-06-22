@@ -14,7 +14,7 @@ services:
       - "9099:9099" # Auth
       - "9199:9199" # Storage
     volumes:
-      - ./firebase-data:/app/firebase-data # For data persistence
+      - ./firebase-data:/app/firebase-data # Persistent data on host
     networks:
       - app-network
     healthcheck:
@@ -94,3 +94,4 @@ networks:
 
 volumes:
   playwright-user-data: # For browser profile persistence
+

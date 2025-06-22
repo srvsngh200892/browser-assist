@@ -1,12 +1,7 @@
 // Firebase Admin SDK replacement for client SDK usage
-import { initializeApp, applicationDefault } from "firebase-admin/app";
-import {
-    getFirestore,
-    Timestamp,
-    FieldValue,
-} from "firebase-admin/firestore";
+import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import { v4 as uuid } from "uuid";
-import admin from 'firebase-admin';
+import admin from '../config/firebase';
 
 import {
     USE_FIREBASE_EMULATOR,
@@ -18,9 +13,7 @@ import {
 import type { MessageType } from "./messages";
 import { toMillis } from "../utils/firebase-date-to-milli";
 
-// Initialize Firebase Admin
-const app = initializeApp({ credential: applicationDefault(), projectId: FIREBASE_PROJECT_ID });
-const db = getFirestore();
+const db = admin.firestore();
 
 // Connect to emulator if needed
 if (USE_FIREBASE_EMULATOR) {
@@ -272,4 +265,26 @@ export async function getLastAssistantMessage(sessionId: string): Promise<Messag
 
     const { timestamp, messageId, sessionId: sid, ...content } = data;
     return content as MessageType;
+}
+
+export async function deleteAllMessagesForSession(sessionId: string) {
+    const collectionRef = db.collection(MESSAGES_COLLECTION);
+    const snapshot = await collectionRef.where("sessionId", "==", sessionId).get();
+
+    if (snapshot.empty) {
+        return;
+    }
+
+    const batchSize = 500;
+    const batches = [];
+    for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+        const batch = db.batch();
+        const chunk = snapshot.docs.slice(i, i + batchSize);
+        chunk.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        batches.push(batch.commit());
+    }
+
+    await Promise.all(batches);
 }

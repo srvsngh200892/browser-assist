@@ -106,7 +106,6 @@ export const removeMcpClient = async (sessionId: string): Promise<void> => {
     try {
       await client.close();
       activeClients.delete(sessionId);
-      await deleteMcpSession(sessionId);
       console.log(`Successfully disconnected MCP client for session ${sessionId}`);
     } catch (error) {
       console.error(`Error disconnecting MCP client for session ${sessionId}:`, error);
@@ -120,7 +119,7 @@ const createNewClient = async (sessionId: string): Promise<Client> => {
   const mcpSessionId = mcpSession ? mcpSession.mcpSessionId : undefined
   if (mcpSessionId) {
     console.log(`reconnecting with same client for mcp session ${mcpSessionId}`)
-  }
+  } 
   const url = `${MCP_SERVER_URL}?userSessionId=${sessionId}`
   let sseUrl = new URL(url);
   console.log(`old session id ${mcpSessionId}`)
@@ -178,14 +177,5 @@ const getMcpSession = async (sessionId: string): Promise<McpSessionData> => {
   }
 
   return null;
-};
-
-const deleteMcpSession = async (sessionId: string): Promise<void> => {
-  try {
-    const docRef = db.collection("mcpSessions").doc(sessionId);
-    await docRef.delete();
-  } catch (error) {
-    console.error(`Error deleting mcpSession with ID ${sessionId}:`, error);
-  }
 };
 

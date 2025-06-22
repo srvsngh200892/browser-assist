@@ -1,36 +1,46 @@
 FROM node:18
 
+# Set the Playwright cache directory
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright-browsers
+
+# Install system dependencies required by Playwright browsers
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm-dev \
+    libasound2 \
+    libatk1.0-0 \
+    libgtk-3-0 \
+    libdrm2 \
+    && mkdir -p $PLAYWRIGHT_BROWSERS_PATH \
+    && chmod -R 777 $PLAYWRIGHT_BROWSERS_PATH \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN npx playwright install-deps
-
+# Set up app dir and permissions
 WORKDIR /app
-
 RUN mkdir -p /app/node_modules && chown -R node:node /app
-RUN mkdir -p /app/user-data && chown -R node:node /app/user-data
+
+# Use unprivileged user for runtime
 USER node
 
-# Copy package files first for better caching
+# Copy package files and install
 COPY --chown=node:node mcp-playwright-sse-server/package*.json ./
 COPY --chown=node:node mcp-playwright-sse-server/tsconfig.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Copy source files, maintaining the correct directory structure
-COPY --chown=node:node mcp-playwright-sse-server/src/ ./src/
-
-# Build TypeScript code during image build
-RUN npm run build
-
-# Install browser
+# Install the browser binary at build time
 RUN npx playwright install chromium
 
-EXPOSE 3003
+# Copy source and build
+COPY --chown=node:node mcp-playwright-sse-server/src/ ./src/
+RUN npm run build
 
-# Start the server with the compiled JS (no need to rebuild)
+# Expose and launch
+EXPOSE 3003
 CMD ["node", "dist/server-stream.js"]

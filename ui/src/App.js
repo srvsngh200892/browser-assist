@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { WELCOME_MESSAGE, PLACEHOLDER_IMAGE } from './constants';
 import './App.css';
 import Header from './components/Header'; // Import the SessionInfo component
@@ -20,6 +21,9 @@ import { useSession } from './hooks/useSession'
 import { useStreamManagement } from './hooks/useStreamManagement'
 import { useHandleSendMessage } from './hooks/useHandleSendMessage'
 import { useToggleFunction } from './hooks/useToggleFunction'
+import { TestCyclesPage } from './pages/TestCyclesPage';
+import { SharedStepsPage } from './pages/SharedStepsPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 /**
  * OpenAI MCP Client
@@ -32,8 +36,8 @@ function App() {
         setSessionId,
         handleLoginSuccess,
         handleLogout,
-      } = useAuth();
-        
+    } = useAuth();
+
 
     const [browserImage, setBrowserImage] = useState(PLACEHOLDER_IMAGE); // For storing the browser preview image
     // Status messages
@@ -53,6 +57,8 @@ function App() {
     const [messages, setMessages] = useState(WELCOME_MESSAGE);
     const [loading, setLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState(''); // For storing partial responses
+    const location = useLocation();
+    const isChatPage = location.pathname === '/';
 
 
     /**
@@ -67,29 +73,29 @@ function App() {
     }, []);
 
     const { sessionIdRef,
-            setError,
-            setReusingSession 
-        } = useSession(sessionId)
+        setError,
+        setReusingSession
+    } = useSession(sessionId)
 
     const { streamSourceRef,
-            streaming,
-            streamStatus,
-            setStreamStatus,
-            cleanupStream,
-            stopStream,
-            pingServer,
-            restartStream,
-            startStream,
-            reconnectToStream, 
-            resumeStream 
-        } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
+        streaming,
+        streamStatus,
+        setStreamStatus,
+        cleanupStream,
+        stopStream,
+        pingServer,
+        restartStream,
+        startStream,
+        reconnectToStream,
+        resumeStream
+    } = useStreamManagement(sessionId, setBrowserImage, addStatusMessage, PLACEHOLDER_IMAGE);
 
-        //Toggle Function
+    //Toggle Function
     const { showTechnicalMessages,
-            previewVisible,
-            toggleTechnicalMessages,
-            togglePreview
-        } = useToggleFunction()
+        previewVisible,
+        toggleTechnicalMessages,
+        togglePreview
+    } = useToggleFunction()
 
     // Initial message loader
     const { typingMessageIds, setTypingMessageIds } = useInitialMessages(
@@ -166,59 +172,76 @@ function App() {
     //Scroll Button State
     useScrollButtonState(chatContainerRef, messages, messagesEndRef, userScrolledAwayRef, setShowScrollButton);
 
- 
+
     return (
         <div className="app-container">
-            {!isAuthenticated ? (
-                <Login onLoginSuccess={handleLoginSuccess} />
+            {isAuthenticated && (
+                <Header
+                    showPreviewButton={isChatPage}
+                    togglePreview={togglePreview}
+                    previewVisible={previewVisible}
+                    pingServer={pingServer}
+                    user={user}
+                    handleLogout={handleLogout}
+                />
+            )}
+            {isAuthenticated && isChatPage && sessionId && <SessionInfo sessionId={sessionId} />}
+            {isAuthenticated ? (
+                <main className="main-content">
+                    <Routes>
+                        <Route path="/" element={
+                            <>
+                                <ChatSection
+                                    messages={messages}
+                                    loading={loading}
+                                    showTechnicalMessages={showTechnicalMessages}
+                                    sessionId={sessionId}
+                                    hasScreenshots={hasScreenshots}
+                                    screenshotCount={screenshotCount}
+                                    addStatusMessage={addStatusMessage}
+                                    handleSendMessage={handleSendMessage}
+                                    toggleTechnicalMessages={toggleTechnicalMessages}
+                                    typingMessageIds={typingMessageIds}
+                                    messagesEndRef={messagesEndRef}
+                                    chatContainerRef={chatContainerRef}
+                                    inputRef={inputRef}
+                                    showScrollButton={showScrollButton}
+                                    scrollToBottom={scrollToBottom}
+                                    handleChatScroll={handleChatScroll}
+                                />
+                                {previewVisible && (
+                                    <PreviewSection
+                                        previewVisible={previewVisible}
+                                        browserImage={browserImage}
+                                        streaming={streaming}
+                                        streamStatus={streamStatus}
+                                        sessionId={sessionId}
+                                        takeScreenshot={takeScreenshot}
+                                        startStream={startStream}
+                                        stopStream={stopStream}
+                                        restartStream={restartStream}
+                                        statusMessages={statusMessages}
+                                    />
+                                )}
+                            </>
+                        } />
+                        <Route path="/test-cycles" element={<TestCyclesPage />} />
+                        <Route path="/shared-steps" element={<SharedStepsPage />} />
+                    </Routes>
+                </main>
             ) : (
-                <>
-                    <Header
-                        togglePreview={togglePreview}
-                        previewVisible={previewVisible}
-                        pingServer={pingServer}
-                        user={user} // Pass user as prop
-                        handleLogout={handleLogout} // Pass logout as prop
-                    />
-                    {sessionId && <SessionInfo sessionId={sessionId} />}
-                    <main className="main-content">
-                        <ChatSection
-                            messages={messages}
-                            loading={loading}
-                            showTechnicalMessages={showTechnicalMessages}
-                            sessionId={sessionId}
-                            hasScreenshots={hasScreenshots}
-                            screenshotCount={screenshotCount}
-                            addStatusMessage={addStatusMessage}
-                            handleSendMessage={handleSendMessage}
-                            toggleTechnicalMessages={toggleTechnicalMessages}
-                            typingMessageIds={typingMessageIds}
-                            messagesEndRef={messagesEndRef}
-                            chatContainerRef={chatContainerRef}
-                            inputRef={inputRef}
-                            showScrollButton={showScrollButton}
-                            scrollToBottom={scrollToBottom}
-                            handleChatScroll={handleChatScroll}
-                        />
-                        {previewVisible && (
-                            <PreviewSection
-                                previewVisible={previewVisible}
-                                browserImage={browserImage}
-                                streaming={streaming}
-                                streamStatus={streamStatus}
-                                sessionId={sessionId}
-                                takeScreenshot={takeScreenshot}
-                                startStream={startStream}
-                                stopStream={stopStream}
-                                restartStream={restartStream}
-                                statusMessages={statusMessages}
-                            />
-                        )}
-                    </main>
-                </>
+                <Routes>
+                    <Route path="*" element={<Login onLoginSuccess={handleLoginSuccess} />} />
+                </Routes>
             )}
         </div>
     );
 }
 
-export default App;
+export default function AppWithRouter() {
+    return (
+        <Router>
+            <App />
+        </Router>
+    );
+}

@@ -1,5 +1,6 @@
 // Temporary placeholder for token-utils.ts
 
+import openai from 'openai';
 import { MessageType } from '../services/messages';
 
 
@@ -52,7 +53,6 @@ export async function getStructuredAutomationSteps(
                         3. Click "Submit".
                     Output the steps in a clean, imperative format (e.g., "Click", "Fill", "Select").`;
 
-
     const response = await openai.chat.completions.create({
         model: model,
         messages: [
@@ -69,4 +69,40 @@ export async function getStructuredAutomationSteps(
     });
 
     return response.choices[0].message.content;
+}
+
+export async function classifySentiment(openai: any, userTask: string, aiResponse: string, model: string) {
+    if (!userTask || !aiResponse) {
+        return "negative";
+    }
+    //add log to check agent and user input , in one line
+    console.log(`Checking sentiment for Agent input: ${userTask} against User input: ${aiResponse}`);
+    const prompt = `
+  You will receive a user task and an AI response.
+  
+  Your job is to determine the sentiment of the AI response based on whether it achieves the user's end goal — not on whether it follows every individual instruction.
+  
+  If the AI response clearly accomplishes the user's final objective (the end goal), return "positive".
+  If the AI response fails to achieve the intended outcome, or leaves it ambiguous, return "negative".
+  
+  Only return one word: "positive" or "negative".
+  
+  User Task:
+  ${userTask}
+  
+  AI Response:
+  ${aiResponse}
+  `;
+
+    const response = await openai.chat.completions.create({
+        model: model, // or "gpt-3.5-turbo"
+        messages: [
+            { role: "system", content: "You are a sentiment classification assistant focused on task outcomes." },
+            { role: "user", content: prompt }
+        ],
+        temperature: 0
+    });
+
+    const sentiment = response.choices[0].message.content.trim().toLowerCase();
+    return sentiment || "negative";
 }

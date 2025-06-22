@@ -2,7 +2,7 @@ import { getSessionMetadata, updateSessionMetadata } from "./firebase-sessions";
 import { createValidation, getValidation, updateValidation, StepResult } from "./firebase-validation";
 import { runValidationAgent } from "./validation-agent";
 
-export async function startValidationViaAI(sessionId: string, reValidated: boolean = false) {
+export async function startValidationViaAI(sessionId: string, reValidated: boolean = false, runVia: string = "chat", testCaseId: string = "") {
     let partialRetry = false;
     let stepToRetry: string[] = [];
     let failedStepsWithIndex: { step: string, index: number }[] = [];
@@ -43,15 +43,16 @@ export async function startValidationViaAI(sessionId: string, reValidated: boole
         await updateValidation(sessionId, { status: 'pending' });
     }
 
-    (async () => {
+    const performValidation = async () => {
         try {
-            const { result, lastScreenshotUsedForValidation, error } = await runValidationAgent(sessionId, stepToRetry, partialRetry);
+            const { result, lastScreenshotUsedForValidation, error } = await runValidationAgent(sessionId, stepToRetry, partialRetry, runVia, testCaseId);
             if (error) {
-                return await updateValidation(sessionId, {
+                await updateValidation(sessionId, {
                     status: 'error',
                     error: error,
                     progress: 100
                 });
+                return;
             }
             if (mergedResult && validationResult?.result) {
                 let index = validationResult.result.findIndex(result => result.finalResult === 'Fail');
@@ -106,7 +107,13 @@ export async function startValidationViaAI(sessionId: string, reValidated: boole
                 error: err instanceof Error ? err.message : 'Unknown error',
             });
         }
-    })();
+    };
 
-    return { success: true, status: 'processing', message: 'Validation started.', agent: 'test-planner' };
+    if (runVia === 'test-case') {
+        await performValidation();
+
+    } else {
+        performValidation();
+        return { success: true, status: 'processing', message: 'Validation started.', agent: 'test-planner' };
+    }
 }

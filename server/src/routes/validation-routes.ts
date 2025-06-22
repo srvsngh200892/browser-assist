@@ -358,4 +358,62 @@ router.get('/validate-via-ai/:sessionId', authMiddleware, async (req: any, res: 
     res.json({ ...doc, result: mergedResult });
 });
 
+
+/**
+ * POST /validation/report/:sessionId/generate
+ * 
+ * Start a background process to generate a validation report PDF
+ */
+router.post('/validation/test-case-report/:testCaseId/generate', authMiddleware, async (req: any, res: Response) => {
+    try {
+        // Get user information from the auth middleware
+        const user = req.user;
+        if (!user || !user.userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'Authentication required'
+            });
+        }
+
+        const { testCaseId: sessionId } = req.params;
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                error: 'There is not report for this test case'
+            });
+        }
+
+        // Verify session exists and belongs to the user
+        const sessionData = await getSessionMetadata(sessionId);
+        if (!sessionData) {
+            return res.status(404).json({
+                success: false,
+                error: 'Session not found'
+            });
+        }
+
+        // Verify ownership
+        if (sessionData.userId !== user.userId) {
+            return res.status(403).json({
+                success: false,
+                error: 'You do not have permission to access this session'
+            });
+        }
+        // Start the background generation process
+        const result = await startBackgroundValidationReport(sessionId, 'test-case');
+
+        return res.json({
+            success: true,
+            ...result
+        });
+
+    } catch (error: unknown) {
+        console.error(`Error starting validation report generation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to start validation report generation'
+        });
+    }
+});
+
 export default router; 

@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import admin from '../config/firebase';
 import sharp from 'sharp';
 import phash from 'sharp-phash';
 import { USE_FIREBASE_EMULATOR, FIREBASE_EMULATOR_HOST, FIREBASE_STORAGE_EMULATOR_PORT } from "./env";
@@ -9,6 +9,7 @@ import { getSessionMetadata } from './firebase-sessions';
 console.log(`Initializing Firebase Admin with storage bucket ${process.env.FIREBASE_STORAGE_BUCKET}`);
 if (!admin.apps.length) {
     admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID,
         storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // Ensure this is set
     });
 }
@@ -21,6 +22,12 @@ if (USE_FIREBASE_EMULATOR) {
 
 const bucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET);
 
+export const deleteFolder = async (folderPath: string) => {
+    const [files] = await bucket.getFiles({ prefix: folderPath });
+    for (const file of files) {
+        await file.delete();
+    }
+};
 const getScreenshotPath = (sessionId: string, timestamp: number) => {
     return `validations/${sessionId}/screenshots/${timestamp}.png`;
 };
@@ -138,7 +145,8 @@ export async function storeScreenshot(
     base64Image: string,
     lastPerceptualHash?: string,
     similarityThreshold: number = 85,
-    blankImageThreshold: number = 0.50
+    blankImageThreshold: number = 0.50,
+    skipThreshold: boolean = false
 ): Promise<{
     url: string;
     hash: string;
@@ -158,7 +166,8 @@ export async function storeScreenshot(
         if (isBlank) return null;
 
         const { similarity, hash } = await calculatePerceptualSimilarity(compressResult.imageBuffer, lastPerceptualHash);
-        if (similarity >= similarityThreshold) return null;
+        console.log("similarity", similarity, "similarityThreshold", similarityThreshold, "skipThreshold", skipThreshold)
+        if (similarity >= similarityThreshold && !skipThreshold) return null;
 
         const timestamp = Date.now();
         const path = getScreenshotPath(sessionId, timestamp);

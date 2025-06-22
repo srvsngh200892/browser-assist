@@ -1,5 +1,5 @@
+import admin from '../config/firebase';
 import PDFDocument from 'pdfkit';
-import admin from 'firebase-admin';
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -7,15 +7,7 @@ import * as path from 'path';
 import axios from 'axios';
 import { getSessionMetadata } from './firebase-sessions';
 import { getValidation } from './firebase-validation';
-
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.applicationDefault(), // use appropriate credential method
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // replace with your storage bucket URL
-        projectId: process.env.FIREBASE_PROJECT_ID
-    });
-}
+import { getTestCase } from './firebase-test-cycles';
 
 const storageBucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET);
 const db = admin.firestore();
@@ -78,7 +70,39 @@ async function getSignedUrl(file: any) {
 /**
  * Fetch all messages for a session
  */
-async function fetchSessionMessages(sessionId: string) {
+async function fetchSessionMessages(sessionId: string, type: string = 'chat') {
+    //if type is test-case get testcase from testcaseId as sessiongid and get all steps id as list of sessionId and then get all messages from messages collection with where sessionId in list of sessionId
+    if (type === 'test-case') {
+        const testCaseDoc = await db.collection('testCases').doc(sessionId).get();
+        if (!testCaseDoc.exists) {
+            console.error(`Test case with ID ${sessionId} not found.`);
+            return [];
+        }
+        const userId = testCaseDoc.data()?.userId;
+        if (!userId) {
+            console.error(`User ID not found for test case ${sessionId}.`);
+            return [];
+        }
+
+        const testCase = await getTestCase(sessionId, userId);
+        const steps = testCase?.steps;
+
+        if (!steps || steps.length === 0) {
+            console.log(`No steps found for test case ${sessionId}.`);
+            return [];
+        }
+
+        const messages = [];
+        for (const step of steps) {
+            const messagesCollection = db.collection('messages');
+            const q = messagesCollection.where('sessionId', '==', step.id)
+                .where('role', 'in', ['user', 'assistant'])
+                .orderBy('timestamp', 'asc');
+            const snapshot = await q.get();
+            messages.push(...snapshot.docs.map(doc => doc.data()));
+        }
+        return messages;
+    }
     try {
         const messagesCollection = db.collection('messages');
         const q = messagesCollection.where('sessionId', '==', sessionId)
@@ -95,7 +119,55 @@ async function fetchSessionMessages(sessionId: string) {
 /**
  * Fetch all screenshots for a session from Firebase Storage
  */
-async function fetchSessionScreenshots(sessionId: string) {
+async function fetchSessionScreenshots(sessionId: string, type: string = 'chat') {
+    if (type === 'test-case') {
+        try {
+            const testCaseDoc = await db.collection('testCases').doc(sessionId).get();
+            if (!testCaseDoc.exists) {
+                console.error(`Test case ${sessionId} not found.`);
+                return [];
+            }
+            const userId = testCaseDoc.data()?.userId;
+            if (!userId) {
+                console.error(`User ID not found for test case ${sessionId}.`);
+                return [];
+            }
+            const testCase = await getTestCase(sessionId, userId);
+            const steps = testCase?.steps;
+            if (!steps || !Array.isArray(steps) || steps.length === 0) {
+                console.log(`No steps found for test case ${sessionId}.`);
+                return [];
+            }
+
+            const allScreenshots = [];
+            for (const step of steps) {
+                const stepSessionId = step.id;
+                const [files] = await storageBucket.getFiles({ prefix: `validations/${stepSessionId}/screenshots` });
+
+                for (const file of files) {
+                    try {
+                        const url = await getSignedUrl(file);
+                        const filename = file.name;
+                        const timestamp = parseInt(path.basename(filename).split('.')[0], 10) || Date.now();
+                        allScreenshots.push({
+                            url: url[0],
+                            timestamp,
+                            path: file.name
+                        });
+                    } catch (itemError) {
+                        console.error(`Error processing screenshot ${file.name}:`, itemError);
+                    }
+                }
+            }
+
+            console.log(`Found ${allScreenshots.length} total screenshots for test case ${sessionId}.`);
+            return allScreenshots.sort((a, b) => a.timestamp - b.timestamp);
+        } catch (error) {
+            console.error(`Error fetching screenshots for test case ${sessionId}:`, error);
+            throw error;
+        }
+    }
+
     try {
         // List all screenshots in the directory
         const [files] = await storageBucket.getFiles({ prefix: `validations/${sessionId}/screenshots` });
@@ -188,7 +260,7 @@ function updatePdfGenerationProgress(sessionId: string, progress: number, status
 /**
  * Main function to generate validation report PDF
  */
-export async function generateValidationReport(sessionId: string): Promise<{ tempFilePath: string, filename: string }> {
+export async function generateValidationReport(sessionId: string, type: string = 'chat'): Promise<{ tempFilePath: string, filename: string }> {
     // Create a temporary file path
     const tempDir = os.tmpdir();
     const tempFilePath = path.join(tempDir, `validation-report-${sessionId}.pdf`);
@@ -206,10 +278,10 @@ export async function generateValidationReport(sessionId: string): Promise<{ tem
 
         updatePdfGenerationProgress(sessionId, 5, 'Fetching session data');
 
-        const messages = await fetchSessionMessages(sessionId);
+        const messages = await fetchSessionMessages(sessionId, type);
         updatePdfGenerationProgress(sessionId, 10, 'Fetching messages');
 
-        const screenshots = await fetchSessionScreenshots(sessionId);
+        const screenshots = await fetchSessionScreenshots(sessionId, type);
         updatePdfGenerationProgress(sessionId, 15, 'Fetching screenshots');
 
         const batchProcessor = new BatchedScreenshotProcessor(sessionId, screenshots);
@@ -517,7 +589,7 @@ async function storePdfInStorage(sessionId: string, pdfFilePath: string): Promis
 /**
  * Start PDF generation as a background task
  */
-export async function startBackgroundValidationReport(sessionId: string): Promise<{
+export async function startBackgroundValidationReport(sessionId: string, type: string = 'chat'): Promise<{
     status: string;
     message: string;
     estimatedTimeSeconds?: number;
@@ -527,7 +599,7 @@ export async function startBackgroundValidationReport(sessionId: string): Promis
             const status = pdfGenerationStatus.get(sessionId);
             if (status?.status === 'pending' || status?.status === 'processing') {
                 return {
-                    status: 'already_processing',
+                    status: 'processing',
                     message: 'PDF generation is already in progress',
                     estimatedTimeSeconds: estimateRemainingTime(sessionId)
                 };
@@ -565,7 +637,7 @@ export async function startBackgroundValidationReport(sessionId: string): Promis
                     progress: 0
                 });
 
-                const result = await generateValidationReport(sessionId);
+                const result = await generateValidationReport(sessionId, type);
 
                 updatePdfGenerationProgress(sessionId, 95, 'Uploading PDF to storage');
 
@@ -679,4 +751,8 @@ function estimateRemainingTime(sessionId: string): number {
     const elapsedTime = (Date.now() - status.startTime) / 1000;
     const totalEstimatedTime = estimateProcessingTime(sessionId);
     return Math.max(0, totalEstimatedTime - elapsedTime);
+}
+
+export const analyzePdf = async (sessionId: string, pdfBuffer: Buffer, searchText: string, lastProcessedPage: number) => {
+    // ...
 }

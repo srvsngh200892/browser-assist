@@ -2,11 +2,8 @@ import express from "express";
 import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js"
-import { createServer } from "@playwright/mcp";
-import path from 'path';
-import fs from 'fs';
-
-
+import { createConnection } from "@playwright/mcp";
+import { chromium } from "playwright";
 
 const app = express();
 app.use(express.json());
@@ -14,9 +11,24 @@ app.use(express.json());
 // Map to store transports by session ID
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
+//MAKE THIS READABLE 
 const serverConfig = {
-  launchOptions: { headless: true },
-};
+  browser: {
+    launchOptions: {
+      headless: true,
+      executablePath: chromium.executablePath()
+    },
+    browserName: 'chromium',
+    contextOptions: {
+      viewport: {
+        width: 1280,
+        height: 720
+      }
+    },
+    isolated: true
+  }
+} as const;
+
 
 // Handle POST requests for client-to-server communication
 app.post('/mcp', async (req, res) => {
@@ -39,17 +51,19 @@ app.post('/mcp', async (req, res) => {
       }
     });
     console.log(`creating new transport for session`)
-    // Clean up transport when closed
-    transport.onclose = () => {
-      if (transport.sessionId) {
-        delete transports[transport.sessionId];
-      }
-    };
+
     // const userDataDir = path.resolve(process.env.USER_DATA_DIR || '', userSessionId);
     // // Ensure the directory exists (optional, Playwright can create it)
     // fs.mkdirSync(userDataDir, { recursive: true });
-    const server = createServer({...serverConfig});
-    await server.connect(transport);;
+    const connection = await createConnection(serverConfig);
+    await connection.server.connect(transport);
+    // Clean up transport when closed
+    transport.onclose = async () => {
+      if (transport.sessionId) {
+        delete transports[transport.sessionId];
+        await connection.close();
+      }
+    };
   } else {
     // Invalid request
     res.status(400).json({
@@ -75,7 +89,7 @@ const handleSessionRequest = async (req: express.Request, res: express.Response)
     res.status(400).send('Invalid or missing session ID');
     return;
   }
-  
+
   const transport = transports[sessionId];
   await transport.handleRequest(req, res);
 };
@@ -86,45 +100,8 @@ app.get('/mcp', handleSessionRequest);
 // Handle DELETE requests for session termination
 app.delete('/mcp', handleSessionRequest);
 
-app.delete("/delete-session-folder/:sessionId", async (req: express.Request, res: express.Response) => {
-  const sessionId = req.params.sessionId;
-
-  if (!sessionId) {
-      res.status(400).json({ error: "Missing sessionId in URL path" });
-      return;
-  }
-
-  const baseDir = process.env.USER_DATA_DIR || '';
-
-  const userDataDir = path.resolve(baseDir, sessionId);
-
-  try {
-      const exists = fs.existsSync(userDataDir);
-
-      if (exists) {
-          fs.rmSync(userDataDir, { recursive: true, force: true });
-          res.status(200).json({
-              message: "Session folder deleted",
-              path: userDataDir
-          });
-          return;
-      } else {
-          res.status(200).json({
-              error: "Folder does not exist",
-              path: userDataDir
-          });
-      }
-  } catch (err: any) {
-      console.log("error", err)
-      res.status(500).json({
-          error: "Failed to delete folder",
-          details: err.message
-      });
-      return
-  }
-});
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

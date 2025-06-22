@@ -1,3 +1,7 @@
+import './config/firebase'; // This will initialize firebase
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -13,6 +17,7 @@ import messageRoutes from './routes/message-routes';
 import streamRoutes from './routes/stream-routes';
 import authRoutes from './routes/auth-routes';
 import validationRoutes from './routes/validation-routes';
+import testCycleRoutes from './routes/testCycle';
 
 const app = express();
 
@@ -58,6 +63,7 @@ app.use('/api', messageRoutes);
 app.use('/api', streamRoutes);
 app.use('/api', authRoutes);
 app.use('/api', validationRoutes);
+app.use('/api', testCycleRoutes);
 
 // Health and ping
 app.get("/api/health", (_req, res) => {

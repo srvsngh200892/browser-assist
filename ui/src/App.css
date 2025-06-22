@@ -81,7 +81,8 @@ li {
 
 .main-content {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
   padding: 0;
@@ -92,6 +93,8 @@ li {
 
 .chat-section {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 10px 15px;
@@ -113,8 +116,6 @@ li {
   padding: 10px;
   border: none;
   border-radius: 12px 12px 0 0;
-  height: calc(100vh - 180px);
-  min-height: 400px;
   position: relative;
   width: 100%;
   box-sizing: border-box;
@@ -271,6 +272,8 @@ li {
 
 .preview-section {
   flex: 1.5;
+  min-width: 0;
+  min-height: 0;
   padding: 10px 15px;
   border-left: none;
   overflow-y: auto;
@@ -364,12 +367,10 @@ li {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(
-    45deg,
-    rgba(107, 70, 193, 0.1),
-    rgba(107, 70, 193, 0.3),
-    rgba(107, 70, 193, 0.1)
-  );
+  background: linear-gradient(45deg,
+      rgba(107, 70, 193, 0.1),
+      rgba(107, 70, 193, 0.3),
+      rgba(107, 70, 193, 0.1));
   z-index: 0;
   animation: pulse-bg 2s infinite ease-in-out;
 }
@@ -395,12 +396,10 @@ li {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0) 100%);
   animation: shimmer 2s infinite;
   z-index: 1;
 }
@@ -436,7 +435,7 @@ li {
 }
 
 /* Ensure stream status text is visible over animations */
-.stream-status.pulsing > * {
+.stream-status.pulsing>* {
   position: relative;
   z-index: 2;
 }
@@ -1464,12 +1463,10 @@ li {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(
-    45deg,
-    rgba(107, 70, 193, 0.05),
-    rgba(107, 70, 193, 0.1),
-    rgba(107, 70, 193, 0.05)
-  );
+  background: linear-gradient(45deg,
+      rgba(107, 70, 193, 0.05),
+      rgba(107, 70, 193, 0.1),
+      rgba(107, 70, 193, 0.05));
   z-index: 0;
   animation: message-pulse-bg 3s infinite ease-in-out;
 }
@@ -1481,12 +1478,10 @@ li {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.5) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.5) 50%,
+      rgba(255, 255, 255, 0) 100%);
   animation: message-shimmer 2s infinite;
   z-index: 1;
 }
@@ -1529,7 +1524,7 @@ li {
   z-index: 2;
 }
 
-.message.streaming .message-content > div {
+.message.streaming .message-content>div {
   display: flex;
   align-items: center;
   width: 100%;
@@ -1619,6 +1614,7 @@ li {
 }
 
 @keyframes typing-dot-animation {
+
   0%,
   80%,
   100% {
@@ -1695,6 +1691,7 @@ li {
 }
 
 @keyframes cursor-blink {
+
   0%,
   49% {
     opacity: 1;
@@ -1712,6 +1709,7 @@ li {
 }
 
 @keyframes typing-pulse {
+
   0%,
   100% {
     box-shadow: 0 0 5px rgba(107, 70, 193, 0.3);
@@ -1752,6 +1750,7 @@ li {
 }
 
 @keyframes thinking-dots {
+
   0%,
   20% {
     content: "";

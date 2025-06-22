@@ -1,18 +1,10 @@
-
-import { getFirestore, FieldValue, WriteBatch } from "firebase-admin/firestore";
-import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
+import admin from '../config/firebase';
+import { FieldValue, WriteBatch } from "firebase-admin/firestore";
 import sessionStore from './session-store';
 import { MessageHandler } from './messages';
 import { sessionHasMessages } from "./firebase-messages";
-// Initialize Firebase Admin if not already initialized
-if (!getFirestore.length) {
-    initializeApp({
-        credential: applicationDefault(), // or use cert({...}) if needed
-    });
-}
 
-
-const db = getFirestore();
+const db = admin.firestore();
 
 const SESSIONS_COLLECTION = "sessions";
 
@@ -22,7 +14,9 @@ export interface SessionMetadata {
     createdAt: FirebaseFirestore.Timestamp;
     lastActive: FirebaseFirestore.Timestamp;
     status: 'active' | 'inactive' | 'expired';
+    type: 'login' | 'test-case',
     messageProcessing: boolean,
+    testCaseProcessing?: "pass" | "fail" | "processing" | null,
     lastMessageRetrieval: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
     lastScreenshotUsedForValidation?: string | null;
     lastMessageUsedForValidation?: number | null;
@@ -46,7 +40,8 @@ export interface StreamState {
 export async function createSession(
     sessionId: string,
     userId: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    type: 'login' | 'test-case' = 'login'
 ): Promise<string | null> {
     try {
         const sessionData: SessionMetadata = {
@@ -58,6 +53,7 @@ export async function createSession(
             status: 'active',
             messageProcessing: false,
             metadata,
+            type,
         };
 
         await db.collection(SESSIONS_COLLECTION).doc(sessionId).set(sessionData);
@@ -131,6 +127,43 @@ export async function listActiveSessions(): Promise<SessionMetadata[]> {
 
 export async function setSessionStatus(sessionId: string, status: 'active' | 'inactive' | 'expired'): Promise<boolean> {
     return updateSessionMetadata(sessionId, { status });
+}
+
+export async function getLatestSessionByUserId(userId: string, type: 'login' | 'test-case' = 'login'): Promise<SessionMetadata | null> {
+    try {
+        const querySnap = await db
+            .collection(SESSIONS_COLLECTION)
+            .where("userId", "==", userId)
+            .where("type", "==", type)
+            .orderBy("lastActive", "desc")
+            .limit(1)
+            .get();
+
+        if (querySnap.empty) {
+            return null;
+        }
+
+        return querySnap.docs[0].data() as SessionMetadata;
+    } catch (error) {
+        console.error(`Error getting latest session for user ${userId}:`, error);
+        return null;
+    }
+}
+
+export async function getSessionsByUserId(userId: string, type: 'login' | 'test-case' = 'login'): Promise<SessionMetadata[]> {
+    try {
+        const querySnap = await db
+            .collection(SESSIONS_COLLECTION)
+            .where("userId", "==", userId)
+            .where("type", "==", type)
+            .orderBy("lastActive", "desc")
+            .get();
+
+        return querySnap.docs.map(doc => doc.data() as SessionMetadata);
+    } catch (error) {
+        console.error(`Error listing sessions for user ${userId}:`, error);
+        return [];
+    }
 }
 
 export async function updatelastMessageRetrieval(sessionId: string): Promise<boolean> {
