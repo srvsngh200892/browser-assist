@@ -276,12 +276,6 @@ router.post("/logout", authMiddleware, async (req: any, res: Response) => {
             path: '/api/refresh' // Clear for all paths
         });
 
-
-        try {
-            await axios.delete(`${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`);
-        } catch (error) {
-            console.error(`error deleting persistent data for ${sessionId} ${MCP_SERVER_BASE_URL}/delete-session-folder/${sessionId}`, error)
-        }
         await deleteMcpSession(sessionId)
         return res.json({
             success: true,

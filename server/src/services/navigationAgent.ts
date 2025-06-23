@@ -109,7 +109,7 @@ export // Function to process responses asynchronously
                 // Propagate finish_reason from response to the assistant message
                 // Create a new message object with the finish_reason added
                 let retryCount = 0;
-                while (response.choices[0].finish_reason == 'stop' && (!response.choices[0].message || !response.choices[0].message.content || response.choices[0].message.content.trim() === "") && retryCount < 20) {
+                while (response.choices[0].finish_reason == 'stop' && (!response.choices[0].message || !response.choices[0].message.content || response.choices[0].message.content.trim() === "") && retryCount < 10) {
                     console.log(`Empty response, retrying... attempt ${retryCount + 1}`);
                     //add message to trim message
                     trimmedMessage.push({

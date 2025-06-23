@@ -5,8 +5,9 @@ RUN apt-get update && \
     apt-get install -y default-jre tini && \
     apt-get clean
 
+
 # Install Firebase CLI
-RUN npm install -g firebase-tools
+RUN npm install -g firebase-tools@13.3.0
 
 WORKDIR /app
 COPY . .
