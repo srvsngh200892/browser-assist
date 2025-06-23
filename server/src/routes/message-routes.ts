@@ -5,12 +5,13 @@ import { deleteAllMessagesForSession, getNewMessages, getSessionMessagesForUI } 
 import { runNavigationAgent, runNavigationTestCaseAgent } from '../services/navigationAgent.js';
 import { getMcpClient } from '../utils/playwright-mcp-client';
 import { toMillis } from '../utils/firebase-date-to-milli';
-import { getTestCase } from "../services/firebase-test-cycles";
+import { getTestCase, updateTestCase } from "../services/firebase-test-cycles";
 import { getOrCreateSessionForTestCase } from "../services/firebase-test-case-sessions";
 import { MessageType } from '../services/messages.js';
 import { deleteFolder } from '../services/firebase-storage.js';
 import { deleteValidationIfExists } from '../services/firebase-validation.js';
 import sessionStore from '../services/session-store';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Define a custom interface for working with tool calls
 interface ToolCall {
@@ -217,7 +218,8 @@ router.post("/chat/test-case/:testCaseId", authMiddleware, async (req: Authentic
         // TODO: Check if user has access to the test case if necessary
 
 
-
+        //update test case executedAt
+        await updateTestCase(testCase.cycleId, user.userId, testCaseId, { executedAt: Timestamp.now() });
 
         const steps = testCase.steps || [];
         const mcpClient = await getMcpClient(testCaseId);

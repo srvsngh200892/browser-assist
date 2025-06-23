@@ -12,6 +12,7 @@ export interface Step {
     name?: string;
     content: string;
     createdAt: Timestamp;
+    updatedAt: Timestamp;
     tags: string[];
     type: 'shared' | 'no-shared';
     userId: string;
@@ -28,6 +29,8 @@ export interface TestCase {
     cycleId: string;
     userId: string;
     stepIds: string[];
+    executedAt?: Timestamp;
+    updatedAt: Timestamp;
     // This is for API response compatibility, it won't be stored in Firestore
     steps?: Step[];
 }
@@ -150,6 +153,7 @@ export async function addTestCase(cycleId: string, userId: string, description: 
             jiraIssueIds,
             jiraTestIds,
             createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
             cycleId,
             userId,
             stepIds: [],
@@ -409,7 +413,7 @@ export async function updateTestCase(
     cycleId: string,
     userId: string,
     testCaseId: string,
-    updates: { description?: string; tags?: string[], jiraIssueIds?: string[], jiraTestIds?: string[] }
+    updates: { description?: string; tags?: string[], jiraIssueIds?: string[], jiraTestIds?: string[], executedAt?: Timestamp }
 ): Promise<boolean> {
     try {
         const testCaseRef = db.collection(TEST_CASES_COLLECTION).doc(testCaseId);
@@ -420,7 +424,7 @@ export async function updateTestCase(
         }
 
         // Remove undefined values from updates
-        const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+        const cleanUpdates: { [key: string]: any } = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
 
         if (Object.keys(cleanUpdates).length === 0) {
             return true; // Nothing to update
@@ -453,6 +457,7 @@ export async function addStepToTestCase(
             id: uuid(),
             content,
             createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
             tags,
             type: isShared ? 'shared' : 'no-shared',
             userId,
@@ -464,7 +469,8 @@ export async function addStepToTestCase(
         const batch = db.batch();
         batch.set(stepRef, newStep);
         batch.update(testCaseRef, {
-            stepIds: FieldValue.arrayUnion(newStep.id)
+            stepIds: FieldValue.arrayUnion(newStep.id),
+            updatedAt: Timestamp.now()
         });
         await batch.commit();
 
@@ -504,9 +510,10 @@ export async function updateStepInTestCase(
         }
 
         // Remove undefined values from updates
-        const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+        const cleanUpdates: { [key: string]: any } = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
 
         if (Object.keys(cleanUpdates).length > 0) {
+            cleanUpdates.updatedAt = Timestamp.now();
             await stepRef.update(cleanUpdates);
         }
 
@@ -537,7 +544,8 @@ export async function deleteStepFromTestCase(
 
         // Remove step from testcase
         batch.update(testCaseRef, {
-            stepIds: FieldValue.arrayRemove(stepId)
+            stepIds: FieldValue.arrayRemove(stepId),
+            updatedAt: Timestamp.now()
         });
 
         // If step exists and is not shared, delete it.
@@ -611,6 +619,7 @@ export async function checkStepUsage(userId: string, stepId: string): Promise<{ 
 }
 
 export async function linkStepToTestCase(userId: string, testCaseId: string, stepId: string): Promise<boolean> {
+
     try {
         const testCaseRef = db.collection(TEST_CASES_COLLECTION).doc(testCaseId);
         const testCaseDoc = await testCaseRef.get();
@@ -634,7 +643,8 @@ export async function linkStepToTestCase(userId: string, testCaseId: string, ste
         }
 
         await testCaseRef.update({
-            stepIds: FieldValue.arrayUnion(stepId)
+            stepIds: FieldValue.arrayUnion(stepId),
+            updatedAt: Timestamp.now()
         });
 
         return true;
@@ -683,6 +693,7 @@ export async function createSharedStep(userId: string, name: string, content: st
             name,
             content,
             createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
             tags,
             type: 'shared',
             userId,
@@ -724,8 +735,8 @@ export async function updateSharedStep(
             cleanUpdates.groupId = null;
         }
 
-
         if (Object.keys(cleanUpdates).length > 0) {
+            cleanUpdates.updatedAt = Timestamp.now();
             await stepRef.update(cleanUpdates);
         }
 
@@ -785,9 +796,10 @@ export async function updateStep(
         }
 
         // Remove undefined values from updates
-        const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+        const cleanUpdates: { [key: string]: any } = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
 
         if (Object.keys(cleanUpdates).length > 0) {
+            cleanUpdates.updatedAt = Timestamp.now();
             await stepRef.update(cleanUpdates);
         }
 

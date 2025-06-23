@@ -23,15 +23,18 @@ import {
     DialogContentText,
     DialogActions,
     ListSubheader,
-    Toolbar
+    Toolbar,
+    Alert,
+    Tooltip
 } from '@mui/material';
 import { keyframes } from '@emotion/react';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, PlayArrow as PlayArrowIcon, CheckCircle, Cancel, HelpOutline, Assessment as AssessmentIcon, Download as DownloadIcon, AutoAwesome as AiIcon, Close as CloseIcon, PlaylistAddCheck as PlaylistAddCheckIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, PlayArrow as PlayArrowIcon, CheckCircle, Cancel, HelpOutline, Assessment as AssessmentIcon, Download as DownloadIcon, AutoAwesome as AiIcon, Close as CloseIcon, PlaylistAddCheck as PlaylistAddCheckIcon, WarningAmber } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { testCycleService } from '../services/testCycleService';
 import { ValidationResult } from '../components/ValidationResult';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { needsReExecution } from '../utils/testCaseUtils';
 
 const PURPLE = '#7c3aed';
 const LIGHT_PURPLE = '#ede9fe';
@@ -107,6 +110,7 @@ const StepExecutionStatus = ({ stepStatus }) => {
 
     const { navigationStatus, validationStatus, validationResult } = stepStatus;
     const lastValidationRun = validationResult?.result?.[validationResult.result.length - 1];
+    const validationError = validationResult?.error;
 
     return (
         <Box sx={{ mt: 2, p: 2, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#f8fafc' }}>
@@ -138,6 +142,13 @@ const StepExecutionStatus = ({ stepStatus }) => {
             {(validationStatus?.toLowerCase() === 'pass' || validationStatus?.toLowerCase() === 'fail') && lastValidationRun && (
                 <Box sx={{ mt: 2 }}>
                     <ValidationResult result={lastValidationRun} onDownload={() => { }} />
+                </Box>
+            )}
+            {validationStatus?.toLowerCase() === 'fail' && validationError && (
+                <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ color: 'red', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {validationError}
+                    </Typography>
                 </Box>
             )}
         </Box>
@@ -424,6 +435,7 @@ export const TestCyclesPage = () => {
                     ...prev,
                     [testCase.id]: { ...prev[testCase.id], status: 'executing_navigation', sessionId: data.sessionId }
                 }));
+                await loadTestCycles(selectedCycle.id, selectedTestCase.id);
             } else {
                 setExecutionDetails(prev => ({
                     ...prev,
@@ -525,14 +537,11 @@ export const TestCyclesPage = () => {
             return;
         }
         try {
-            const newStep = await testCycleService.addStep(selectedCycle.id, selectedTestCase.id, {
+            await testCycleService.addStep(selectedCycle.id, selectedTestCase.id, {
                 content: newStepContent,
                 tags: newStepTags.split(',').map(tag => tag.trim()).filter(Boolean)
             });
-            const updatedSteps = [...steps, newStep];
-            setSteps(updatedSteps);
-            const updatedTestCases = testCases.map(tc => tc.id === selectedTestCase.id ? { ...tc, steps: updatedSteps } : tc);
-            setTestCases(updatedTestCases);
+            await loadTestCycles(selectedCycle.id, selectedTestCase.id);
 
             toast.success("Step added successfully!");
             setNewStepContent('');
@@ -553,10 +562,7 @@ export const TestCyclesPage = () => {
                 content: editingStep.content,
                 tags: editingStep.tags
             });
-            const updatedSteps = steps.map(s => s.id === stepId ? editingStep : s);
-            setSteps(updatedSteps);
-            const updatedTestCases = testCases.map(tc => tc.id === selectedTestCase.id ? { ...tc, steps: updatedSteps } : tc);
-            setTestCases(updatedTestCases);
+            await loadTestCycles(selectedCycle.id, selectedTestCase.id);
 
             toast.success("Step updated successfully!");
             setEditingStep(null);
@@ -914,10 +920,15 @@ export const TestCyclesPage = () => {
                                             {tc.description}
                                         </Typography>
                                     </Box>
-                                    <Box sx={{ mt: 1.5, pl: 3 }}>
-                                        {tc.tags?.map(tag => (
-                                            <Chip key={tag} label={tag} size="small" sx={{ mr: 0.5, mb: 0.5, bgcolor: '#e5e7eb' }} />
-                                        ))}
+                                    <Box sx={{ mt: 1.5, pl: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Created: {format(convertFirebaseTimestamp(tc.createdAt), 'MMM d, yyyy')}
+                                        </Typography>
+                                        {needsReExecution(tc) && (
+                                            <Tooltip title="Some steps have been added or modified. Please re-execute.">
+                                                <WarningAmber sx={{ color: 'warning.main' }} />
+                                            </Tooltip>
+                                        )}
                                     </Box>
                                 </Paper>
                             );
@@ -990,6 +1001,19 @@ export const TestCyclesPage = () => {
                             <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2, background: '#f8fafc', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                 {selectedTestCase.description}
                             </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+                                Created: {format(convertFirebaseTimestamp(selectedTestCase.createdAt), 'MMM d, yyyy')}
+                                {selectedTestCase.executedAt && (
+                                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                                        Last Executed: {format(convertFirebaseTimestamp(selectedTestCase.executedAt), 'MMM d, yyyy p')}
+                                    </Typography>
+                                )}
+                            </Typography>
+                            {needsReExecution({ ...selectedTestCase, steps }) && (
+                                <Alert severity="warning" sx={{ mb: 2 }}>
+                                    Some steps have been added or modified. Please re-execute, as the previous run may not be valid.
+                                </Alert>
+                            )}
                             <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                                 {selectedTestCase.tags?.map(tag => (
                                     <Chip key={tag} label={tag} size="small" />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { testCycleService } from '../../services/testCycleService';
 import {
+    Alert,
     Box,
     Button,
     Card,
@@ -17,6 +18,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { needsReExecution } from '../../utils/testCaseUtils';
 
 // Helper function to convert Firebase Timestamp to Date
 const convertFirebaseTimestamp = (timestamp) => {
@@ -141,6 +143,11 @@ export const TestCaseList = ({ cycleId }) => {
                             </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                 Created: {format(convertFirebaseTimestamp(testCase.createdAt), 'MMM d, yyyy')}
+                                {testCase.executedAt && (
+                                    <span style={{ marginLeft: '16px' }}>
+                                        Last Executed: {format(convertFirebaseTimestamp(testCase.executedAt), 'MMM d, yyyy p')}
+                                    </span>
+                                )}
                             </Typography>
                             <Box sx={{ mt: 1 }}>
                                 {testCase.tags.map((tag) => (
@@ -152,6 +159,11 @@ export const TestCaseList = ({ cycleId }) => {
                                     />
                                 ))}
                             </Box>
+                            {needsReExecution(testCase) && (
+                                <Alert severity="warning" sx={{ mt: 2 }}>
+                                    Some steps have been added or modified. Please re-execute, as the previous run may not be valid.
+                                </Alert>
+                            )}
                         </CardContent>
                     </Card>
                 ))}
